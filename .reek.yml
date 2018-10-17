@@ -1,0 +1,6 @@
+detectors:
+  UncommunicativeVariableName:
+    enabled: false
+exclude_paths:
+  - bin
+  - client
