@@ -1,19 +1,17 @@
+require_relative 'component/cache'
 require 'erb'
 require 'rack/response'
 
+# Rack::Component is a convenient way of responding to a request
 module Rack
-  # Render a chain of components
+  # This is me, imagining if React.js had been designed in Ruby
   class Component
-    # If your Component’s template does not require dynamic interpolation,
-    # you can declare it as a class-level constant.
-    TEMPLATE = %(<%= children %>).freeze
-
-    attr_reader :props
+    attr_reader :props, :block
 
     # Handle a Rack request
     # @param [hash] env a rack ENV hash
     # @return [Array] a finished rack tuple
-    def self.call(env, &block)
+    def self.call(env = {}, &block)
       new(env, &block).to_rack_tuple
     end
 
@@ -40,12 +38,12 @@ module Rack
 
     def initialize(props = {}, &block)
       @props = props
-      @children = block
+      @block = block
     end
 
     # @return [String] the rendered component instance
     def to_s
-      ERB.new(_render).result(binding)
+      _erb
     end
 
     # @return [Array] a tuple of [status, header, body],
@@ -56,27 +54,61 @@ module Rack
 
     private
 
-    def _render
-      render.to_s
+    # Evaluate self.render via ERB in the current binding
+    # @return [String]
+    def _erb
+      ERB.new(render.to_s).result(binding)
     end
 
     # Override render to customize a component
-    # @return [String] the rendered output
+    # @return [#to_s] an object that responds to to_s
     def render
-      self.class.const_get(:TEMPLATE)
+      children
     end
 
-    # Yield to the next block, if called
+    # render child components, if there are any
+    # @return [#to_s]
     def children
-      @children ? @children.call(self) : nil
+      @block ? @block.call(self) : nil
     end
 
+    # HTTP headers to include in a Rack::Response
+    # @return [Hash]
     def headers
       {}
     end
 
+    # A valid HTTP status
+    # @return [Integer]
     def status
       200
+    end
+
+    # Rack::Component::Pure is just like Component, only it
+    # caches its rendered output in memory and only rerenders
+    # when called with new props or a new block
+    class Pure < self
+      def self.cache
+        @cache ||= Cache.new
+      end
+
+      # @return[String] the rendered component instance from cache,
+      # or by executing the erb template when not cached
+      def to_s
+        cached { _erb }
+      end
+
+      # Check the class-level cache, set it to &block if nil
+      # @return [Object] the output of &block.call
+      def cached(&block)
+        self.class.cache.get(key, &block)
+      end
+
+      # a unique key for this component, based on a hash of props & block
+      # @return [Integer]
+      def key
+        [props, block].hash
+      end
     end
   end
 end

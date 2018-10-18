@@ -22,20 +22,26 @@ module Views
   end
 
   class Header < Rack::Component
-    TEMPLATE = %(
-      <header>
-        <h1>The Header</h1>
-        <%= children %>
-      </header>
-    ).freeze
+    def render
+      %(
+        <header>
+          <h1>The Header</h1>
+          <%= children %>
+        </header>
+      )
+    end
   end
 
   class Footer < Rack::Component
-    TEMPLATE = %(<footer>The Footer</footer>).freeze
+    def render
+      %(<footer>The Footer</footer>)
+    end
   end
 
   class PropsComponent < Rack::Component
-    TEMPLATE = %(<%= props[:name] %>).freeze
+    def render
+      %(<%= props[:name] %>)
+    end
   end
 
   class JSONComponent < Rack::Component

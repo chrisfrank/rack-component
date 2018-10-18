@@ -1,5 +1,7 @@
 require 'spec_helper'
 require_relative 'fixtures/views'
+require 'pry'
+require 'securerandom'
 
 RSpec.describe Rack::Component do
   describe 'responding to call' do
@@ -97,6 +99,32 @@ RSpec.describe Rack::Component do
     it 'can render json' do
       Views::JSONComponent.render { 'hmmm' }.tap do |res|
         expect(JSON.parse(res).first.fetch('rank')).to eq('captain')
+      end
+    end
+  end
+
+  describe Rack::Component::Pure do
+    RandomComponent = Class.new(Rack::Component::Pure) do
+      def render
+        SecureRandom.uuid
+      end
+    end
+
+    it 'caches identical calls' do
+      RandomComponent.render.tap do |uuid|
+        expect(RandomComponent.render).to eq(uuid)
+      end
+    end
+
+    it 'busts cache based on block' do
+      RandomComponent.render.tap do |uuid|
+        expect(RandomComponent.render { 'children' }).not_to eq(uuid)
+      end
+    end
+
+    it 'busts cache based on props' do
+      RandomComponent.render.tap do |uuid|
+        expect(RandomComponent.render(1)).not_to eq(uuid)
       end
     end
   end

@@ -6,32 +6,35 @@ require 'tilt'
 Benchmark.ips do |bm|
   property = 'hello'
   struct = Struct.new(:property).new('hello')
-  template = IO.read("#{__dir__}/fixtures/template.erb")
-  tilt = Tilt['erb'].new { template }
+  TEMPLATE = IO.read("#{__dir__}/fixtures/template.erb")
+  tilt = Tilt['erb'].new { TEMPLATE }
 
-  FastComponent = Class.new(Rack::Component) do
-    TEMPLATE = template
+  Comp = Class.new(Rack::Component) do
     def property
       'hello'
+    end
+
+    def render
+      TEMPLATE
     end
   end
 
-  SlowComponent = Class.new(Rack::Component) do
+  PureComp = Class.new(Rack::Component::Pure) do
     def property
       'hello'
     end
 
-    def template
-      template
+    def render
+      TEMPLATE
     end
   end
 
   bm.report('Raw ERB') do
-    ERB.new(template).result(binding)
+    ERB.new(TEMPLATE).result(binding)
   end
 
   bm.report('Tilt (naive)') do
-    Tilt['erb'].new { template }.render(struct)
+    Tilt['erb'].new { TEMPLATE }.render(struct)
   end
 
   bm.report('Tilt (cached)') do
@@ -39,10 +42,10 @@ Benchmark.ips do |bm|
   end
 
   bm.report('Rack::Component') do
-    FastComponent.call
+    Comp.render
   end
 
-  bm.report('Rack::Component (slow)') do
-    SlowComponent.call
+  bm.report('Rack::Component::Pure') do
+    PureComp.render
   end
 end
