@@ -14,13 +14,20 @@ module Views
           <a href="#<%= page %>"><%= page %></a>
         <% end %>
         </nav>
-        <%= children %>
+        <main>
+          <%= children %>
+        </main>
       )
     end
   end
 
   class Header < Rack::Component
-    TEMPLATE = %(<header>The Header</header>).freeze
+    TEMPLATE = %(
+      <header>
+        <h1>The Header</h1>
+        <%= children %>
+      </header>
+    ).freeze
   end
 
   class Footer < Rack::Component

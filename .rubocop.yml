@@ -4,6 +4,9 @@ Layout/LeadingCommentSpace:
   Enabled: false
 Metrics/BlockLength:
   Enabled: false
+Metrics/MethodLength:
+  ExcludedMethods:
+    - render
 Style/FrozenStringLiteralComment:
   EnforcedStyle: never
 Style/AsciiComments:

@@ -1,5 +1,5 @@
-require_relative 'component/version'
 require 'erb'
+require 'rack/response'
 
 module Rack
   # Render a chain of components
@@ -9,6 +9,13 @@ module Rack
     TEMPLATE = %(<%= children %>).freeze
 
     attr_reader :props
+
+    # Handle a Rack request
+    # @param [hash] env a rack ENV hash
+    # @return [Array] a finished rack tuple
+    def self.call(env, &block)
+      new(env, &block).to_rack_tuple
+    end
 
     # Render a new Rack::Component as a string
     # @param [Hash] props the properties passed to the component instance
@@ -24,8 +31,10 @@ module Rack
     #     end
     #   end
     #
-    #   MyComponent.call(world: 'Earth') #=> '<h1>Hello Earth</h1>'
-    def self.call(props = {}, &block)
+    #   MyComponent.render(world: 'Earth') #=> '<h1>Hello Earth</h1>'
+    #
+    # @return [String] a rendered component instance
+    def self.render(props = {}, &block)
       new(props, &block).to_s
     end
 
@@ -34,9 +43,15 @@ module Rack
       @children = block
     end
 
-    # @return [String] the rendered component
+    # @return [String] the rendered component instance
     def to_s
       ERB.new(_render).result(binding)
+    end
+
+    # @return [Array] a tuple of [status, header, body],
+    # where body is the Component's rendered output
+    def to_rack_tuple
+      Rack::Response.new(to_s, status, headers).finish
     end
 
     private
@@ -54,6 +69,14 @@ module Rack
     # Yield to the next block, if called
     def children
       @children ? @children.call(self) : nil
+    end
+
+    def headers
+      {}
+    end
+
+    def status
+      200
     end
   end
 end

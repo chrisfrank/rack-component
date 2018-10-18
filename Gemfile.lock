@@ -2,6 +2,7 @@ PATH
   remote: .
   specs:
     rack-component (0.1.0)
+      rack (>= 1.6, < 3)
 
 GEM
   remote: https://rubygems.org/
@@ -39,6 +40,9 @@ GEM
     pry (0.11.3)
       coderay (~> 1.1.0)
       method_source (~> 0.9.0)
+    rack (2.0.5)
+    rack-test (0.8.3)
+      rack (>= 1.0, < 3)
     rainbow (3.0.0)
     rake (10.5.0)
     reek (5.2.0)
@@ -87,6 +91,7 @@ DEPENDENCIES
   overcommit (~> 0)
   pry (~> 0.11)
   rack-component!
+  rack-test (~> 0)
   rake (~> 10.0)
   reek (~> 5)
   rspec (~> 3.0)

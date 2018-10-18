@@ -1,10 +1,9 @@
 lib = File.expand_path('lib', __dir__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
-require 'rack/component/version'
 
 Gem::Specification.new do |spec|
   spec.name          = 'rack-component'
-  spec.version       = Rack::Component::VERSION
+  spec.version       = '0.1.0'
   spec.authors       = ['Chris Frank']
   spec.email         = ['chris.frank@future.com']
   spec.licenses      = ['MIT']
@@ -26,14 +25,18 @@ Gem::Specification.new do |spec|
   spec.files = Dir.chdir(File.expand_path(__dir__)) do
     `git ls-files -z`.split("\x0").reject { |f| f.match(%r{^(test|spec|features)/}) }
   end
-  spec.bindir        = 'exe'
+  spec.bindir        = 'bin'
   spec.executables   = spec.files.grep(%r{^exe/}) { |f| File.basename(f) }
   spec.require_paths = ['lib']
 
+  spec.required_ruby_version = '>= 2.2'
+
+  spec.add_dependency 'rack', '>= 1.6', '< 3'
   spec.add_development_dependency 'benchmark-ips', '~> 2.7'
   spec.add_development_dependency 'bundler', '~> 1.16'
   spec.add_development_dependency 'overcommit', '~> 0'
   spec.add_development_dependency 'pry', '~> 0.11'
+  spec.add_development_dependency 'rack-test', '~> 0'
   spec.add_development_dependency 'rake', '~> 10.0'
   spec.add_development_dependency 'reek', '~> 5'
   spec.add_development_dependency 'rspec', '~> 3.0'

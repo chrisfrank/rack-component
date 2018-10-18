@@ -3,8 +3,8 @@ require 'rspec/core/rake_task'
 
 RSpec::Core::RakeTask.new(:spec)
 
-task :rubocop do
-  system 'bundle exec rubocop lib spec'
+task :cop do
+  system 'bundle exec rubocop {lib,spec}'
 end
 
 task :reek do
@@ -15,4 +15,4 @@ task :doc do
   system 'bundle exec yard doc'
 end
 
-task default: %i[rubocop reek spec doc]
+task default: %i[cop reek spec doc]
