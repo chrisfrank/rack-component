@@ -17,7 +17,7 @@ module Rack
 
       def set(key, value)
         LOCK.synchronize do
-          @cache[key] = value
+          @cache.merge!(key => value)
           value
         end
       end

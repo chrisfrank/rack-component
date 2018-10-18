@@ -4,7 +4,7 @@ require 'rack/response'
 
 # Rack::Component is a convenient way of responding to a request
 module Rack
-  # This is me, imagining if React.js had been designed in Ruby
+  # If React.js had been designed in Ruby, maybe it would look like this
   class Component
     attr_reader :props, :block
 
@@ -66,8 +66,8 @@ module Rack
       children
     end
 
-    # render child components, if there are any
-    # @return [#to_s]
+    # render child Components, if there are any
+    # @return [#to_s] the rendered output
     def children
       @block ? @block.call(self) : nil
     end
