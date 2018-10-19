@@ -29,23 +29,19 @@ Benchmark.ips do |bm|
     end
   end
 
-  bm.report('Raw ERB') do
+  bm.report('Ruby stdlib ERB') do
     ERB.new(TEMPLATE).result(binding)
-  end
-
-  bm.report('Tilt (naive)') do
-    Tilt['erb'].new { TEMPLATE }.render(struct)
   end
 
   bm.report('Tilt (cached)') do
     tilt.render(struct)
   end
 
-  bm.report('Rack::Component') do
+  bm.report('Component') do
     Comp.render
   end
 
-  bm.report('Rack::Component::Memoized') do
+  bm.report('Component::Memoized') do
     FastComp.render
   end
 end

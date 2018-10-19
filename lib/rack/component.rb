@@ -1,8 +1,7 @@
-require_relative 'component/cache'
 require 'erb'
 require 'rack/response'
+require_relative 'component/cache'
 
-# Rack::Component is a convenient way of responding to a request
 module Rack
   # If React.js had been designed in Ruby, maybe it would look like this
   class Component
@@ -41,13 +40,14 @@ module Rack
       @block = block
     end
 
+    # Render component as a string
     # @return [String] the rendered component instance
     def to_s
       _erb
     end
 
-    # @return [Array] a tuple of [status, header, body],
-    # where body is the Component's rendered output
+    # Render a finished Rack::Response
+    # @return [Array] a tuple of [#status, #headers, #to_s]
     def to_rack_tuple
       Rack::Response.new(to_s, status, headers).finish
     end
@@ -87,7 +87,9 @@ module Rack
     # Rack::Component::Memoized is just like Component, only it
     # caches its rendered output in memory and only rerenders
     # when called with new props or a new block
-    Memoized = Class.new(self) do
+    class Memoized < self
+      # instantiate a class-level cache if necessary
+      # @return [Rack::Component::Cache] a threadsafe in-memory cache
       def self.cache
         @cache ||= Cache.new
       end

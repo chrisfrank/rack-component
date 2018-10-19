@@ -1,6 +1,4 @@
 module Rack
-  # Reopen Component as if it were a module,
-  # just to create a namespaced Cache class
   class Component
     # Threadsafe in-memory cache
     class Cache

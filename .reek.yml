@@ -1,4 +1,6 @@
 detectors:
+  IrresponsibleModule:
+    enabled: false
   UncommunicativeVariableName:
     enabled: false
 exclude_paths:
