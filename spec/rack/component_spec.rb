@@ -1,5 +1,5 @@
 require 'spec_helper'
-require_relative 'fixtures/views'
+require_relative '../fixtures/views'
 require 'pry'
 require 'securerandom'
 
@@ -103,8 +103,8 @@ RSpec.describe Rack::Component do
     end
   end
 
-  describe Rack::Component::Pure do
-    RandomComponent = Class.new(Rack::Component::Pure) do
+  describe Rack::Component::Memoized do
+    RandomComponent = Class.new(Rack::Component::Memoized) do
       def render
         SecureRandom.uuid
       end

@@ -1,24 +1,30 @@
 module Rack
-  # Render a chain of components
+  # Reopen Component as if it were a module,
+  # just to create a namespaced Cache class
   class Component
-    # Threadsafe in-memory cache for holding cached output
+    # Threadsafe in-memory cache
     class Cache
+      # A mutex for threadsafe cache writes
       LOCK = Mutex.new
 
+      # Store cache in a hash
       def initialize
         @cache = {}
       end
 
-      def get(key)
+      # Fetch a key from the cache, if it exists
+      # If the key doesn't exist and a block is passed, set the key
+      # @return the cached value
+      def fetch(key)
         @cache.fetch(key) do
-          set(key, yield)
+          write(key, yield) if block_given?
         end
       end
 
-      def set(key, value)
+      # Cache a value in memory
+      def write(key, value)
         LOCK.synchronize do
-          @cache.merge!(key => value)
-          value
+          @cache.store(key, value)
         end
       end
     end

@@ -84,10 +84,10 @@ module Rack
       200
     end
 
-    # Rack::Component::Pure is just like Component, only it
+    # Rack::Component::Memoized is just like Component, only it
     # caches its rendered output in memory and only rerenders
     # when called with new props or a new block
-    class Pure < self
+    Memoized = Class.new(self) do
       def self.cache
         @cache ||= Cache.new
       end
@@ -95,13 +95,13 @@ module Rack
       # @return[String] the rendered component instance from cache,
       # or by executing the erb template when not cached
       def to_s
-        cached { _erb }
+        memoized { _erb }
       end
 
       # Check the class-level cache, set it to &block if nil
       # @return [Object] the output of &block.call
-      def cached(&block)
-        self.class.cache.get(key, &block)
+      def memoized(&block)
+        self.class.cache.fetch(key, &block)
       end
 
       # a unique key for this component, based on a hash of props & block

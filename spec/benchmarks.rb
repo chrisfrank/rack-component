@@ -19,7 +19,7 @@ Benchmark.ips do |bm|
     end
   end
 
-  PureComp = Class.new(Rack::Component::Pure) do
+  FastComp = Class.new(Rack::Component::Memoized) do
     def property
       'hello'
     end
@@ -45,7 +45,7 @@ Benchmark.ips do |bm|
     Comp.render
   end
 
-  bm.report('Rack::Component::Pure') do
-    PureComp.render
+  bm.report('Rack::Component::Memoized') do
+    FastComp.render
   end
 end
