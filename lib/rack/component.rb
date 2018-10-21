@@ -3,17 +3,18 @@ require 'rack/response'
 require_relative 'component/component_cache'
 
 module Rack
-  # Subclass Rack::Component to compose declarative, functional HTTP responses
+  # Subclass Rack::Component to compose declarative, component-driven
+  # responses to HTTP requests
   class Component
     attr_reader :props, :block
     alias env props
 
     # Handle a Rack request
     # @param [Hash] env a rack ENV hash
-    # @return [Array] a finished rack tuple
+    # @return [Array] a finished Rack::Response tuple
     def self.call(env)
       catch :halt do
-        new(env).render_to_rack_tuple
+        new(env).finish
       end
     end
 
@@ -22,7 +23,7 @@ module Rack
       @block = block
     end
 
-    # Render Component as a string
+    # Render component as a string
     #
     # @example render a HelloWorld component
     #   class HelloWorld < Rack::Component
@@ -44,7 +45,7 @@ module Rack
 
     # Render a finished Rack::Response
     # @return [Array] a tuple of [#status, #headers, #to_s]
-    def render_to_rack_tuple
+    def finish
       Rack::Response.new(to_s, status, headers).finish
     end
 
@@ -72,8 +73,8 @@ module Rack
 
     # render child Components, if there are any
     # @return [#to_s] the rendered output
-    def children(scope = self)
-      @block ? @block.call(scope) : nil
+    def children(scope = self, *args)
+      @block ? @block.call(scope, *args) : nil
     end
 
     # HTTP headers to include in a Rack::Response
@@ -93,7 +94,7 @@ module Rack
     # when called with new props or a new block
     class Memoized < self
       # instantiate a class-level cache if necessary
-      # @return [Rack::Component::Cache] a threadsafe in-memory cache
+      # @return [Rack::Component::ComponentCache] a threadsafe in-memory cache
       def self.cache
         @cache ||= ComponentCache.new
       end

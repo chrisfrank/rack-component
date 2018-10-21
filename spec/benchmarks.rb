@@ -38,10 +38,10 @@ Benchmark.ips do |bm|
   end
 
   bm.report('Component') do
-    Comp.render
+    Comp.new.to_s
   end
 
   bm.report('Component::Memoized') do
-    FastComp.render
+    FastComp.new.to_s
   end
 end

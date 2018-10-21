@@ -4,7 +4,7 @@ require 'rspec/core/rake_task'
 RSpec::Core::RakeTask.new(:spec)
 
 task :cop do
-  system 'bundle exec rubocop {lib,spec}'
+  system 'bundle exec rubocop lib'
 end
 
 task :reek do

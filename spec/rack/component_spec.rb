@@ -15,50 +15,6 @@ RSpec.describe Rack::Component do
       end
       it('renders an empty body') { expect(@res.body).to eq('') }
     end
-
-    describe 'with a real component chain' do
-      let(:app) do
-        Class.new(Rack::Component) do
-          def status
-            207
-          end
-
-          def headers
-            { 'X-Rendered-By' => 'Rack::Component' }
-          end
-
-          def render
-            Views::Layout.new do
-              %(
-                <article>
-                  <p>I am an html paragraph</p>
-                  #{Views::Footer.new}
-                  #{props['HTTP_HOST']}
-                </article>
-              )
-            end
-          end
-        end
-      end
-
-      before { @res = get('/') }
-
-      it 'renders its child components' do
-        expect(@res.body).to include('<article>')
-        expect(@res.body).to include('<nav>')
-      end
-
-      it 'merges custom headers' do
-        expect(@res.headers['X-Rendered-By']).to eq('Rack::Component')
-        expect(@res.headers).to have_key('Content-Length')
-      end
-
-      it('respects custom status') { expect(@res.status).to eq(207) }
-
-      it 'has access to Rack’s [env] hash via self.props' do
-        expect(@res.body).to include('example.org')
-      end
-    end
   end
 
   describe 'rendering to string' do
@@ -68,7 +24,7 @@ RSpec.describe Rack::Component do
       end
     end
 
-    it 'nests components' do
+    it 'renders nested components' do
       Views::Layout.new { 'nested' }.to_s.tap do |res|
         expect(res).to include('nested')
       end
@@ -99,6 +55,19 @@ RSpec.describe Rack::Component do
     it 'can render json' do
       Views::JSONComponent.new { 'hmmm' }.tap do |res|
         expect(JSON.parse(res.to_s).first.fetch('rank')).to eq('captain')
+      end
+    end
+
+    it 'can render children of any arity' do
+      Comp = Class.new(Rack::Component) do
+        def hi() 'hi' end
+
+        def render
+          children(self, 'this', 'that')
+        end
+      end
+      Comp.new { |scope, x, y| [scope.hi, x, y].join(' ') }.to_s.tap do |res|
+        expect(res).to eq('hi this that')
       end
     end
   end
