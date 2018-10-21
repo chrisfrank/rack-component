@@ -61,15 +61,15 @@ RSpec.describe Rack::Component do
     end
   end
 
-  describe 'rendering' do
+  describe 'rendering to string' do
     it 'renders children by default' do
-      Rack::Component.render { 'child node' }.tap do |res|
+      Rack::Component.new { 'child node' }.to_s.tap do |res|
         expect(res).to eq('child node')
       end
     end
 
     it 'nests components' do
-      Views::Layout.render { 'nested' }.tap do |res|
+      Views::Layout.new { 'nested' }.to_s.tap do |res|
         expect(res).to include('nested')
       end
     end
@@ -84,21 +84,21 @@ RSpec.describe Rack::Component do
           )
         end
       end
-      Test.render.tap do |res|
+      Test.new.to_s.tap do |res|
         expect(res).to include('<header>')
         expect(res).to include('<footer>')
       end
     end
 
     it 'has access to props when rendering' do
-      Views::PropsComponent.render(name: 'Chris').tap do |res|
+      Views::PropsComponent.new(name: 'Chris').to_s.tap do |res|
         expect(res).to eq('Chris')
       end
     end
 
     it 'can render json' do
-      Views::JSONComponent.render { 'hmmm' }.tap do |res|
-        expect(JSON.parse(res).first.fetch('rank')).to eq('captain')
+      Views::JSONComponent.new { 'hmmm' }.tap do |res|
+        expect(JSON.parse(res.to_s).first.fetch('rank')).to eq('captain')
       end
     end
   end
@@ -111,21 +111,42 @@ RSpec.describe Rack::Component do
     end
 
     it 'caches identical calls' do
-      RandomComponent.render.tap do |uuid|
-        expect(RandomComponent.render).to eq(uuid)
+      RandomComponent.new.to_s.tap do |uuid|
+        expect(RandomComponent.new.to_s).to eq(uuid)
       end
     end
 
     it 'busts cache based on block' do
-      RandomComponent.render.tap do |uuid|
-        expect(RandomComponent.render { 'children' }).not_to eq(uuid)
+      RandomComponent.new.to_s do |uuid|
+        expect(RandomComponent.new { 'children' }.to_s).not_to eq(uuid)
       end
     end
 
     it 'busts cache based on props' do
-      RandomComponent.render.tap do |uuid|
-        expect(RandomComponent.render(1)).not_to eq(uuid)
+      RandomComponent.new.to_s do |uuid|
+        expect(RandomComponent.new(1).to_s).not_to eq(uuid)
       end
+    end
+
+    it 'busts cache based on nested blocks' do
+      Layout = Class.new(RandomComponent)
+      first = Layout.new do
+        RandomComponent.new do
+          RandomComponent.new do
+            'hi'
+          end
+        end
+      end.to_s
+
+      last = Layout.new do
+        RandomComponent.new do
+          RandomComponent.new do
+            'bye'
+          end
+        end
+      end.to_s
+
+      expect(first).not_to eq(last)
     end
   end
 end

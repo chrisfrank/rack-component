@@ -1,21 +1,28 @@
 require 'erb'
 require 'rack/response'
-require_relative 'component/cache'
+require_relative 'component/component_cache'
 
 module Rack
-  # If React.js had been designed in Ruby, maybe it would look like this
+  # Subclass Rack::Component to compose declarative, functional HTTP responses
   class Component
     attr_reader :props, :block
+    alias env props
 
     # Handle a Rack request
-    # @param [hash] env a rack ENV hash
+    # @param [Hash] env a rack ENV hash
     # @return [Array] a finished rack tuple
-    def self.call(env = {}, &block)
-      new(env, &block).to_rack_tuple
+    def self.call(env)
+      catch :halt do
+        new(env).render_to_rack_tuple
+      end
     end
 
-    # Render a new Rack::Component as a string
-    # @param [Hash] props the properties passed to the component instance
+    def initialize(props = {}, &block)
+      @props = props
+      @block = block
+    end
+
+    # Render Component as a string
     #
     # @example render a HelloWorld component
     #   class HelloWorld < Rack::Component
@@ -28,19 +35,8 @@ module Rack
     #     end
     #   end
     #
-    #   MyComponent.render(world: 'Earth') #=> '<h1>Hello Earth</h1>'
-    #
-    # @return [String] a rendered component instance
-    def self.render(props = {}, &block)
-      new(props, &block).to_s
-    end
-
-    def initialize(props = {}, &block)
-      @props = props
-      @block = block
-    end
-
-    # Render component as a string
+    #   MyComponent.new(world: 'Earth').to_s #=> '<h1>Hello Earth</h1>'
+    #   "#{MyComponent.new(world: 'Earth')}" #=> '<h1>Hello Earth</h1>'
     # @return [String] the rendered component instance
     def to_s
       _erb
@@ -48,8 +44,16 @@ module Rack
 
     # Render a finished Rack::Response
     # @return [Array] a tuple of [#status, #headers, #to_s]
-    def to_rack_tuple
+    def render_to_rack_tuple
       Rack::Response.new(to_s, status, headers).finish
+    end
+
+    # @param [Integer] status an HTTP status code
+    # @param [String] body a response body
+    # @param [Hash] headers HTTP headers
+    # @return [Array] a tuple of [#status, #headers, #to_s]
+    def halt(status = 404, body = '', headers = {})
+      throw :halt, Rack::Response.new(body, status, headers).finish
     end
 
     private
@@ -68,8 +72,8 @@ module Rack
 
     # render child Components, if there are any
     # @return [#to_s] the rendered output
-    def children
-      @block ? @block.call(self) : nil
+    def children(scope = self)
+      @block ? @block.call(scope) : nil
     end
 
     # HTTP headers to include in a Rack::Response
@@ -91,7 +95,7 @@ module Rack
       # instantiate a class-level cache if necessary
       # @return [Rack::Component::Cache] a threadsafe in-memory cache
       def self.cache
-        @cache ||= Cache.new
+        @cache ||= ComponentCache.new
       end
 
       # @return[String] the rendered component instance from cache,

@@ -1,7 +1,7 @@
 module Rack
   class Component
     # Threadsafe in-memory cache
-    class Cache
+    class ComponentCache
       # A mutex for threadsafe cache writes
       LOCK = Mutex.new
 
@@ -14,19 +14,21 @@ module Rack
       # If the key doesn't exist and a block is passed, set the key
       # @return the cached value
       def fetch(key)
-        @cache.fetch(key) do
-          write(key, yield) if block_given?
+        LOCK.synchronize do
+          @cache.fetch(key) do
+            write(key, yield) if block_given?
+          end
         end
       end
+
+      private
 
       # Cache a value in memory
       def write(key, value)
-        LOCK.synchronize do
-          @cache.store(key, value)
-        end
+        @cache.store(key, value)
       end
     end
 
-    private_constant :Cache
+    private_constant :ComponentCache
   end
 end
