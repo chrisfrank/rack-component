@@ -6,7 +6,11 @@ require 'securerandom'
 RSpec.describe Rack::Component do
   describe 'responding to call' do
     describe 'with defaults' do
-      let(:app) { Rack::Component }
+      let(:app) do
+        Proc.new do |env|
+          [200, {}, Rack::Component.call(env)]
+        end
+      end
       before { @res = get('/') }
 
       it('has HTTP status 200') { expect(@res.status).to eq(200) }

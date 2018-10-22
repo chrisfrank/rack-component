@@ -7,15 +7,11 @@ module Rack
   # responses to HTTP requests
   class Component
     attr_reader :props, :block
-    alias env props
 
-    # Handle a Rack request
-    # @param [Hash] env a rack ENV hash
-    # @return [Array] a finished Rack::Response tuple
-    def self.call(env)
-      catch :halt do
-        new(env).finish
-      end
+    # Initialize a new component with the given props, and render it to string
+    # @return [String] the rendered component
+    def self.call(props = {}, &block)
+      new(props, &block).to_s
     end
 
     def initialize(props = {}, &block)
@@ -43,20 +39,6 @@ module Rack
       _erb
     end
 
-    # Render a finished Rack::Response
-    # @return [Array] a tuple of [#status, #headers, #to_s]
-    def finish
-      Rack::Response.new(to_s, status, headers).finish
-    end
-
-    # @param [Integer] status an HTTP status code
-    # @param [String] body a response body
-    # @param [Hash] headers HTTP headers
-    # @return [Array] a tuple of [#status, #headers, #to_s]
-    def halt(status = 404, body = '', headers = {})
-      throw :halt, Rack::Response.new(body, status, headers).finish
-    end
-
     private
 
     # Evaluate self.render via ERB in the current binding
@@ -75,18 +57,6 @@ module Rack
     # @return [#to_s] the rendered output
     def children(scope = self, *args)
       @block ? @block.call(scope, *args) : nil
-    end
-
-    # HTTP headers to include in a Rack::Response
-    # @return [Hash]
-    def headers
-      {}
-    end
-
-    # A valid HTTP status
-    # @return [Integer]
-    def status
-      200
     end
 
     # Rack::Component::Memoized is just like Component, only it
