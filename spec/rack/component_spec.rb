@@ -1,78 +1,62 @@
 require 'spec_helper'
-require_relative '../fixtures/views'
 require 'pry'
 require 'securerandom'
 
 RSpec.describe Rack::Component do
-  describe 'responding to call' do
-    describe 'with defaults' do
-      let(:app) do
-        Proc.new do |env|
-          [200, {}, Rack::Component.call(env)]
-        end
-      end
-      before { @res = get('/') }
-
-      it('has HTTP status 200') { expect(@res.status).to eq(200) }
-      it('has the default Rack::Response headers') do
-        expect(@res.header).to have_key('Content-Length')
-      end
-      it('renders an empty body') { expect(@res.body).to eq('') }
+  it 'renders children by default' do
+    Rack::Component.call { 'child node' }.tap do |res|
+      expect(res).to eq('child node')
     end
   end
 
-  describe 'rendering to string' do
-    it 'renders children by default' do
-      Rack::Component.new { 'child node' }.to_s.tap do |res|
-        expect(res).to eq('child node')
+  it 'can yield to nested components' do
+    @comp = Class.new(Rack::Component) do
+      def render
+        yield
       end
     end
 
-    it 'renders nested components' do
-      Views::Layout.new { 'nested' }.to_s.tap do |res|
-        expect(res).to include('nested')
+    @comp.call { 'nested' }.tap do |res|
+      expect(res).to include('nested')
+    end
+  end
+
+  it 'has access to props when rendering' do
+    @comp = Class.new(Rack::Component) do
+      def render
+        "#{props[:name]}"
       end
     end
 
-    it 'can mix ERB and string interpolation' do
-      Test = Class.new(Rack::Component) do
-        def render
-          %(
-            #{Views::Header.new}
-            <main>the content</main>
-            <%= Views::Footer.new %>
-          )
-        end
-      end
-      Test.new.to_s.tap do |res|
-        expect(res).to include('<header>')
-        expect(res).to include('<footer>')
+    @comp.call(name: 'Chris').tap do |res|
+      expect(res).to eq('Chris')
+    end
+  end
+
+  it 'can render json' do
+    require 'json'
+    @comp = Class.new(Rack::Component) do
+      def render
+        props.to_json
       end
     end
 
-    it 'has access to props when rendering' do
-      Views::PropsComponent.new(name: 'Chris').to_s.tap do |res|
-        expect(res).to eq('Chris')
+    @comp.call(captain: 'kirk') do |res|
+      expect(JSON.parse(res.to_s).first.fetch('rank')).to eq('captain')
+    end
+  end
+
+  it 'can yield to nested components of any arity' do
+    @comp = Class.new(Rack::Component) do
+      def hi() 'hi' end
+
+      def render
+        yield(self, 'this', 'that')
       end
     end
 
-    it 'can render json' do
-      Views::JSONComponent.new { 'hmmm' }.tap do |res|
-        expect(JSON.parse(res.to_s).first.fetch('rank')).to eq('captain')
-      end
-    end
-
-    it 'can render children of any arity' do
-      Comp = Class.new(Rack::Component) do
-        def hi() 'hi' end
-
-        def render
-          children(self, 'this', 'that')
-        end
-      end
-      Comp.new { |scope, x, y| [scope.hi, x, y].join(' ') }.to_s.tap do |res|
-        expect(res).to eq('hi this that')
-      end
+    @comp.call { |scope, x, y| [scope.hi, x, y].join(' ') }.tap do |res|
+      expect(res).to eq('hi this that')
     end
   end
 
@@ -84,42 +68,59 @@ RSpec.describe Rack::Component do
     end
 
     it 'caches identical calls' do
-      RandomComponent.new.to_s.tap do |uuid|
-        expect(RandomComponent.new.to_s).to eq(uuid)
+      RandomComponent.call.tap do |uuid|
+        expect(RandomComponent.call).to eq(uuid)
       end
     end
 
-    it 'busts cache based on block' do
-      RandomComponent.new.to_s do |uuid|
-        expect(RandomComponent.new { 'children' }.to_s).not_to eq(uuid)
+    it 'limits the cache size to 100 keys by default' do
+      (0..200).map { |key| RandomComponent.call(key) }
+      RandomComponent.cache.instance_variable_get(:@cache).tap do |cache|
+        expect(cache.length).to eq(100)
+      end
+    end
+
+    it 'can change the cache size' do
+      class Tiny < Rack::Component::Memoized
+        CACHE_SIZE = 50
+      end
+      (0..200).map { |key| Tiny.call(key) }
+      Tiny.cache.instance_variable_get(:@cache).tap do |cache|
+        expect(cache.length).to eq(50)
       end
     end
 
     it 'busts cache based on props' do
-      RandomComponent.new.to_s do |uuid|
-        expect(RandomComponent.new(1).to_s).not_to eq(uuid)
+      RandomComponent.call.tap do |uuid|
+        expect(RandomComponent.call(1)).not_to eq(uuid)
       end
     end
 
-    it 'busts cache based on nested blocks' do
+     it 'busts cache based on block' do
+      RandomComponent.call do |uuid|
+        expect(RandomComponent.call { 'children' }).not_to eq(uuid)
+      end
+    end
+
+   it 'does not bust cache based on nested blocks' do
       Layout = Class.new(RandomComponent)
-      first = Layout.new do
-        RandomComponent.new do
-          RandomComponent.new do
+      first = Layout.call do
+        RandomComponent.call do
+          RandomComponent.call do
             'hi'
           end
         end
-      end.to_s
+      end
 
-      last = Layout.new do
-        RandomComponent.new do
-          RandomComponent.new do
+      last = Layout.call do
+        RandomComponent.call do
+          RandomComponent.call do
             'bye'
           end
         end
-      end.to_s
+      end
 
-      expect(first).not_to eq(last)
+      expect(first).to eq(last)
     end
   end
 end

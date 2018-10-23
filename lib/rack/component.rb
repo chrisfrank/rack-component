@@ -1,25 +1,13 @@
-require 'erb'
-require 'rack/response'
 require_relative 'component/component_cache'
 
 module Rack
   # Subclass Rack::Component to compose declarative, component-driven
   # responses to HTTP requests
   class Component
-    attr_reader :props, :block
+    EMPTY = ''.freeze # components render an empty body by default
+    attr_reader :props
 
-    # Initialize a new component with the given props, and render it to string
-    # @return [String] the rendered component
-    def self.call(props = {}, &block)
-      new(props, &block).to_s
-    end
-
-    def initialize(props = {}, &block)
-      @props = props
-      @block = block
-    end
-
-    # Render component as a string
+    # Initialize a new component with the given props, and render it
     #
     # @example render a HelloWorld component
     #   class HelloWorld < Rack::Component
@@ -32,59 +20,59 @@ module Rack
     #     end
     #   end
     #
-    #   MyComponent.new(world: 'Earth').to_s #=> '<h1>Hello Earth</h1>'
-    #   "#{MyComponent.new(world: 'Earth')}" #=> '<h1>Hello Earth</h1>'
-    # @return [String] the rendered component instance
-    def to_s
-      _erb
+    #   MyComponent.call(world: 'Earth') #=> '<h1>Hello Earth</h1>'
+    # @return [String, Object] the rendered component instance
+    def self.call(props = {}, &block)
+      new(props).call(&block)
+    end
+
+    def initialize(props = {})
+      @props = props
+    end
+
+    # Render component
+    # @return [Object] the result of self.render
+    def call(&block)
+      render(&block)
     end
 
     private
 
-    # Evaluate self.render via ERB in the current binding
-    # @return [String]
-    def _erb
-      ERB.new(render.to_s).result(binding)
-    end
-
     # Override render to customize a component
-    # @return [#to_s] an object that responds to to_s
+    # @return [String, Object] usually a string, but really whatever
     def render
-      children
-    end
-
-    # render child Components, if there are any
-    # @return [#to_s] the rendered output
-    def children(scope = self, *args)
-      @block ? @block.call(scope, *args) : nil
+      block_given? ? yield(self) : EMPTY
     end
 
     # Rack::Component::Memoized is just like Component, only it
     # caches its rendered output in memory and only rerenders
-    # when called with new props or a new block
+    # when called with new props or a new block.
     class Memoized < self
+      CACHE_SIZE = 100 # limit cache to 100 keys by default
+
       # instantiate a class-level cache if necessary
       # @return [Rack::Component::ComponentCache] a threadsafe in-memory cache
       def self.cache
-        @cache ||= ComponentCache.new
+        @cache ||= ComponentCache.new(const_get(:CACHE_SIZE))
       end
 
       # @return[String] the rendered component instance from cache,
       # or by executing the erb template when not cached
-      def to_s
-        memoized { _erb }
+      def call(&block)
+        memoized { render(&block) }
       end
 
-      # Check the class-level cache, set it to &block if nil
-      # @return [Object] the output of &block.call
-      def memoized(&block)
-        self.class.cache.fetch(key, &block)
+      # Check the class-level cache, set it to &miss if nil
+      # @return [Object] the output of &miss.call
+      def memoized(&miss)
+        self.class.cache.fetch(key, &miss)
       end
 
-      # a unique key for this component, based on a hash of props & block
+      # a unique key for this component, based on a cryptographic signature
+      # of the component props
       # @return [Integer]
       def key
-        [props, block].hash
+        props.hash
       end
     end
   end

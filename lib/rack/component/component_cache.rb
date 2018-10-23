@@ -2,12 +2,13 @@ module Rack
   class Component
     # Threadsafe in-memory cache
     class ComponentCache
-      # A mutex for threadsafe cache writes
+      # Initialize a mutex for threadsafe reads and writes
       LOCK = Mutex.new
 
       # Store cache in a hash
-      def initialize
+      def initialize(limit = 100)
         @cache = {}
+        @limit = limit
       end
 
       # Fetch a key from the cache, if it exists
@@ -23,9 +24,11 @@ module Rack
 
       private
 
-      # Cache a value in memory
+      # Cache a value and return it
       def write(key, value)
         @cache.store(key, value)
+        @cache.delete(@cache.keys.first) if @cache.length > @limit
+        value
       end
     end
 

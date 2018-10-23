@@ -2,36 +2,40 @@ require_relative 'spec_helper'
 require 'rack/component'
 require 'benchmark/ips'
 require 'tilt'
+require 'securerandom'
+require 'erb'
 
 Benchmark.ips do |bm|
-  property = 'hello'
-  struct = Struct.new(:property).new('hello')
-  TEMPLATE = IO.read("#{__dir__}/fixtures/template.erb")
-  tilt = Tilt['erb'].new { TEMPLATE }
+  Model = Struct.new(:key)
+  TILT_TEMPLATE = Tilt['erb'].new { '<%= key %>' }
+  ERB_TEMPLATE = '<%= @model.key %>'
+  @model = Model.new(SecureRandom.uuid)
 
   Comp = Class.new(Rack::Component) do
-    def property() 'hello' end
-    def render() TEMPLATE end
+    def render
+      %(#{props.key})
+    end
   end
 
   FastComp = Class.new(Rack::Component::Memoized) do
-    def property() 'hello' end
-    def render() TEMPLATE end
+    def render
+      %(#{props.key})
+    end
   end
 
   bm.report('Ruby stdlib ERB') do
-    ERB.new(TEMPLATE).result(binding)
+    ERB.new(ERB_TEMPLATE).result(binding)
   end
 
   bm.report('Tilt (cached)') do
-    tilt.render(struct)
+    TILT_TEMPLATE.render(@model)
   end
 
   bm.report('Component') do
-    Comp.new.to_s
+    Comp.call @model
   end
 
   bm.report('Component::Memoized') do
-    FastComp.new.to_s
+    FastComp.call @model
   end
 end
