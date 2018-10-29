@@ -17,7 +17,7 @@ Benchmark.ips do |bm|
     end
   end
 
-  FastComp = Class.new(Rack::Component::Memoized) do
+  MemoComp = Class.new(Rack::Component::Memoized) do
     def render
       %(#{props.key})
     end
@@ -36,6 +36,6 @@ Benchmark.ips do |bm|
   end
 
   bm.report('Component::Memoized') do
-    FastComp.call @model
+    MemoComp.call @model
   end
 end
