@@ -56,6 +56,15 @@ module Rack
         @cache ||= ComponentCache.new(const_get(:CACHE_SIZE))
       end
 
+      # clear the cache of each descendant class
+      # generally you'll want to call this on Rack::Component::Memoized directly
+      # @example Rack::Component::Memoized.flush_caches
+      def self.clear_caches
+        ObjectSpace.each_object(singleton_class) do |descendant|
+          descendant.cache.flush
+        end
+      end
+
       # @return[String] the rendered component instance from cache,
       # or by executing the erb template when not cached
       def call(&block)
