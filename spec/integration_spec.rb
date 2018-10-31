@@ -1,13 +1,9 @@
 require 'spec_helper'
-require 'rack/component'
-require 'pry'
+require_relative 'fixtures'
 
 RSpec.describe 'An app composed of Rack::Components' do
   # a fake rack app that can catch :halt, like Sinatra or Roda
   class App < Rack::Component
-    # A fake database with a fake 'posts' table
-    DB = { posts: { 1 => { title: 'Test Post', body: 'Post Body' } } }
-
     def self.call(env)
       catch(:halt) { new(env).call }
     end
@@ -23,48 +19,21 @@ RSpec.describe 'An app composed of Rack::Components' do
     end
 
     def body
-      PostFetcher.call(post_id) do |post|
+      PostFetcher.call(id: post_id) do |post|
         Layout.call do
           %(#{PostView.call(post)}<footer>With a weird footer</footer>)
         end
       end
     end
+  end
 
-    # Fetch a post, pass it to the next component
-    class PostFetcher < Rack::Component
-      def post
-        DB[:posts].fetch(props.to_i) { halt }
-      end
-
-      def halt
-        throw :halt, [404, {}, []]
-      end
-
-      def render
-        yield post
-      end
+  class PostFetcher < Rack::Component
+    def fetch
+      DB[:posts].fetch(props[:id].to_i) { halt }
     end
 
-    class Layout < Rack::Component
-      def render
-        %(
-          <!DOCTYPE html>
-            <html>
-            <head>
-              <title>Rack::Compoment</title>
-            </head>
-            <body>
-              #{yield}
-            </body>
-          </html>
-        )
-      end
-    end
-
-    class PostView < Rack::Component
-      def render
-        %(<article>#{props[:title]}</article>)
-      end
+    def halt
+      throw :halt, [404, {}, []]
     end
   end
 

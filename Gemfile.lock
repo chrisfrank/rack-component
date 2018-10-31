@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    rack-component (0.1.2)
+    rack-component (1.0.0)
 
 GEM
   remote: https://rubygems.org/
@@ -29,6 +29,7 @@ GEM
     jaro_winkler (1.5.1)
     kwalify (0.7.2)
     method_source (0.9.0)
+    mustermann (1.0.3)
     overcommit (0.46.0)
       childprocess (~> 0.6, >= 0.6.3)
       iniparse (~> 1.4)
@@ -40,6 +41,8 @@ GEM
       coderay (~> 1.1.0)
       method_source (~> 0.9.0)
     rack (2.0.5)
+    rack-protection (2.0.4)
+      rack
     rack-test (0.8.3)
       rack (>= 1.0, < 3)
     rainbow (3.0.0)
@@ -71,6 +74,11 @@ GEM
       ruby-progressbar (~> 1.7)
       unicode-display_width (~> 1.0, >= 1.0.1)
     ruby-progressbar (1.10.0)
+    sinatra (2.0.4)
+      mustermann (~> 1.0)
+      rack (~> 2.0)
+      rack-protection (= 2.0.4)
+      tilt (~> 2.0)
     thread_safe (0.3.6)
     tilt (2.0.8)
     unicode-display_width (1.4.0)
@@ -95,6 +103,7 @@ DEPENDENCIES
   reek (~> 5)
   rspec (~> 3.0)
   rubocop (~> 0.59)
+  sinatra (~> 2)
   tilt (~> 2)
   yard (~> 0.9)
 

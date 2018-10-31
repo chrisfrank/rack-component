@@ -1,6 +1,8 @@
 # Rack::Component
 
-TODO write docs
+Respond to HTTP requests by composing `Rack::Component`s.
+
+Like a React.js component, a `Rack::Component` implements a render() method that takes input data and returns what to display.
 
 ## Installation
 
@@ -18,9 +20,15 @@ Or install it yourself as:
 
     $ gem install rack-component
 
-## Usage (Generic)
+## Usage
 
-TODO
+You could build an entire Rack app out of `Rack::Component`s, but I mostly use it inside Sinatra and Roda apps, as an alternative to Controllers and Views.
+
+### With Sinatra
+```ruby
+
+
+
 
 ## Development
 
@@ -38,3 +46,7 @@ git commits and tags, and push the `.gem` file to
 
 Bug reports and pull requests are welcome on GitHub at
 https://github.com/chrisfrank/rack-component.
+
+## License
+
+MIT

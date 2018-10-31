@@ -2,6 +2,7 @@ require 'bundler/setup'
 require 'rspec'
 require 'rack/component'
 require 'rack/test'
+require 'pry'
 
 RSpec.configure do |config|
   # Enable flags like --only-failures and --next-failure

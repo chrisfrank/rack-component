@@ -61,22 +61,24 @@ RSpec.describe Rack::Component do
   end
 
   describe Rack::Component::Memoized do
-    RandomComponent = Class.new(Rack::Component::Memoized) do
-      def render
-        SecureRandom.uuid
+    before do
+      @rando = Class.new(Rack::Component::Memoized) do
+        def render
+          SecureRandom.uuid
+        end
       end
     end
 
     it 'caches identical calls' do
-      RandomComponent.call.tap do |uuid|
-        expect(RandomComponent.call).to eq(uuid)
+      @rando.call.tap do |uuid|
+        expect(@rando.call).to eq(uuid)
       end
     end
 
     it 'limits the cache size to 100 keys by default' do
-      (0..200).map { |key| RandomComponent.call(key) }
-      RandomComponent.cache.instance_variable_get(:@cache).tap do |cache|
-        expect(cache.length).to eq(100)
+      (0..200).map { |key| @rando.call(key) }
+      @rando.cache.store.tap do |store|
+        expect(store.length).to eq(100)
       end
     end
 
@@ -85,42 +87,58 @@ RSpec.describe Rack::Component do
         CACHE_SIZE = 50
       end
       (0..200).map { |key| Tiny.call(key) }
-      Tiny.cache.instance_variable_get(:@cache).tap do |cache|
-        expect(cache.length).to eq(50)
+      Tiny.cache.store.tap do |store|
+        expect(store.length).to eq(50)
       end
     end
 
     it 'busts cache based on props' do
-      RandomComponent.call.tap do |uuid|
-        expect(RandomComponent.call(1)).not_to eq(uuid)
+      @rando.call.tap do |uuid|
+        expect(@rando.call(1)).not_to eq(uuid)
       end
     end
 
-     it 'busts cache based on block' do
-      RandomComponent.call do |uuid|
-        expect(RandomComponent.call { 'children' }).not_to eq(uuid)
+    it 'busts cache based on block' do
+      @rando.call do |uuid|
+        expect(@rando.call { 'children' }).not_to eq(uuid)
       end
     end
 
-   it 'does not bust cache based on nested blocks' do
-      Layout = Class.new(RandomComponent)
+    it 'does not bust cache based on nested blocks' do
+      Layout = Class.new(Rack::Component::Memoized)
       first = Layout.call do
-        RandomComponent.call do
-          RandomComponent.call do
+        @rando.call do
+          @rando.call do
             'hi'
           end
         end
       end
 
       last = Layout.call do
-        RandomComponent.call do
-          RandomComponent.call do
+        @rando.call do
+          @rando.call do
             'bye'
           end
         end
       end
 
       expect(first).to eq(last)
+    end
+
+    describe 'flushing the entire component cache' do
+      before do
+        # fill the cache of two memoized components
+        @alt = Class.new(@rando)
+        @rando.call
+        @alt.call
+      end
+
+      it 'flushes children and descendants' do
+        Rack::Component::Memoized.clear_caches
+        [@rando, @alt].each do |comp|
+          expect(comp.cache.store.empty?).to eq(true)
+        end
+      end
     end
   end
 end

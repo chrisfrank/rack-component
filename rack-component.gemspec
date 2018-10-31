@@ -3,12 +3,12 @@ $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
 
 Gem::Specification.new do |spec|
   spec.name          = 'rack-component'
-  spec.version       = '0.1.2'
+  spec.version       = '1.0.0'
   spec.authors       = ['Chris Frank']
   spec.email         = ['chris.frank@future.com']
   spec.licenses      = ['MIT']
 
-  spec.summary       = 'Build reusable, tweakable UI elements out of atomic CSS classes, in any Ruby app.'
+  spec.summary       = 'Respond to HTTP requests by composing React-style components'
   spec.homepage      = 'https://www.github.com/chrisfrank/rack-component'
 
   # Prevent pushing this gem to RubyGems.org. To allow pushes either set the 'allowed_push_host'
@@ -40,6 +40,7 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency 'reek', '~> 5'
   spec.add_development_dependency 'rspec', '~> 3.0'
   spec.add_development_dependency 'rubocop', '~> 0.59'
+  spec.add_development_dependency 'sinatra', '~> 2'
   spec.add_development_dependency 'tilt', '~> 2'
   spec.add_development_dependency 'yard', '~> 0.9'
 end
