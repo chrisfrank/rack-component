@@ -23,19 +23,19 @@ Benchmark.ips do |bm|
     end
   end
 
-  bm.report('Ruby stdlib ERB') do
-    ERB.new(ERB_TEMPLATE).result(binding)
-  end
-
-  bm.report('Tilt (cached)') do
-    TILT_TEMPLATE.render(@model)
-  end
-
+#  bm.report('Ruby stdlib ERB') do
+#    ERB.new(ERB_TEMPLATE).result(binding)
+#  end
+#
+#  bm.report('Tilt (cached)') do
+#    TILT_TEMPLATE.render(@model)
+#  end
+#
   bm.report('Component') do
     Comp.call @model
   end
-
-  bm.report('Component::Memoized') do
-    MemoComp.call @model
-  end
+#
+#  bm.report('Component::Memoized') do
+#    MemoComp.call @model
+#  end
 end

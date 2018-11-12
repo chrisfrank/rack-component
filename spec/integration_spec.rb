@@ -5,7 +5,7 @@ RSpec.describe 'An app composed of Rack::Components' do
   # a fake rack app that can catch :halt, like Sinatra or Roda
   class App < Rack::Component
     def self.call(env)
-      catch(:halt) { new(env).call }
+      catch(:halt) { super }
     end
 
     def post_id
@@ -41,11 +41,11 @@ RSpec.describe 'An app composed of Rack::Components' do
 
   describe 'with a valid id param' do
     it 'renders a post when found in the database' do
-      get('/posts?id=1') { |res| expect(res.body).to include('Test Post') }
+      get('/posts?id=1') { |res| expect(res.body).to include('Example Title') }
     end
 
     it 'can render arbitrary blocks of text' do
-      get('/posts?id=1') { |res| expect(res.body).to include('Test Post') }
+      get('/posts?id=1') { |res| expect(res.body).to include('Example Title') }
     end
   end
 

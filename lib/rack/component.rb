@@ -1,13 +1,15 @@
 require_relative 'component/component_cache'
 
 module Rack
-  # Subclass Rack::Component to compose declarative, component-driven
-  # responses to HTTP requests
+  # Subclass Rack::Component to compose declarative, component-based responses
+  # to HTTP requests
   class Component
+    VERSION = '0.1.0'.freeze
+
     EMPTY = ''.freeze # components render an empty body by default
     attr_reader :props
 
-    # Initialize a new component with the given props, and render it
+    # Initialize a new component with the given props and #render() it.
     #
     # @example render a HelloWorld component
     #   class HelloWorld < Rack::Component
@@ -23,22 +25,14 @@ module Rack
     #   MyComponent.call(world: 'Earth') #=> '<h1>Hello Earth</h1>'
     # @return [String, Object] the rendered component instance
     def self.call(props = {}, &block)
-      new(props).call(&block)
+      new(props).render(&block)
     end
 
     def initialize(props = {})
       @props = props
     end
 
-    # Render component
-    # @return [Object] the result of self.render
-    def call(&block)
-      render(&block)
-    end
-
-    private
-
-    # Override render to customize a component
+    # Override render to make your component do work.
     # @return [String, Object] usually a string, but really whatever
     def render
       block_given? ? yield(self) : EMPTY
@@ -48,7 +42,7 @@ module Rack
     # caches its rendered output in memory and only rerenders
     # when called with new props or a new block.
     class Memoized < self
-      CACHE_SIZE = 100 # limit cache to 100 keys by default
+      CACHE_SIZE = 100 # limit cache to 100 keys by default so we don't leak RAM
 
       # instantiate a class-level cache if necessary
       # @return [Rack::Component::ComponentCache] a threadsafe in-memory cache
@@ -56,32 +50,49 @@ module Rack
         @cache ||= ComponentCache.new(const_get(:CACHE_SIZE))
       end
 
-      # clear the cache of each descendant class
-      # generally you'll want to call this on Rack::Component::Memoized directly
-      # @example Rack::Component::Memoized.flush_caches
+      # @example render a Memoized Component
+      #   class Expensive < Rack::Component::Memoized
+      #     def work
+      #       sleep 5
+      #       "#{props[:id]} was expensive"
+      #     end
+      #
+      #     def render
+      #       %(<h1>#{work}</h1>)
+      #     end
+      #   end
+      #
+      #   # first call takes five seconds
+      #   Expensive.call(id: 1) #=> <h1>1 was expensive</h1>
+      #   # subsequent calls with identical props are instant
+      #
+      #   # subsequent calls with _different_ props take five seconds
+      #   Expensive.call(id: 2) #=> <h1>2 was expensive</h1>
+      #
+      # @return [String, Object] the cached (or computed) output of render
+      def self.call(props = {}, &block)
+        memoized(props) { super }
+      end
+
+      # Check the class-level cache, set it to &miss if nil.
+      # @return [Object] the output of &miss.call
+      def self.memoized(props, &miss)
+        cache.fetch(key(props), &miss)
+      end
+
+      # @return [Integer] a cache key for this component
+      def self.key(props)
+        props.hash
+      end
+
+      # Clear the cache of each descendant class.
+      # Generally you'll call this on Rack::Component::Memoized directly.
+      # @example Clear all caches:
+      #   Rack::Component::Memoized.flush_caches
       def self.clear_caches
         ObjectSpace.each_object(singleton_class) do |descendant|
           descendant.cache.flush
         end
-      end
-
-      # @return[String] the rendered component instance from cache,
-      # or by executing the erb template when not cached
-      def call(&block)
-        memoized { render(&block) }
-      end
-
-      # Check the class-level cache, set it to &miss if nil
-      # @return [Object] the output of &miss.call
-      def memoized(&miss)
-        self.class.cache.fetch(key, &miss)
-      end
-
-      # a unique key for this component, based on a cryptographic signature
-      # of the component props
-      # @return [Integer]
-      def key
-        props.hash
       end
     end
   end

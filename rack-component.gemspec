@@ -1,9 +1,10 @@
 lib = File.expand_path('lib', __dir__)
 $LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
+require 'rack/component'
 
 Gem::Specification.new do |spec|
   spec.name          = 'rack-component'
-  spec.version       = '1.0.0'
+  spec.version       = Rack::Component::VERSION
   spec.authors       = ['Chris Frank']
   spec.email         = ['chris.frank@future.com']
   spec.licenses      = ['MIT']

@@ -1,6 +1,3 @@
-# A fake database with a fake 'posts' table
-DB = { posts: { 1 => { title: 'Test Post', body: 'Post Body' } } }
-
 # render an HTML page
 class Layout < Rack::Component
   def render
@@ -27,6 +24,9 @@ class PostFetcher < Rack::Component
     DB[:posts].fetch(props[:id].to_i)
   end
 end
+
+# A fake database with a fake 'posts' table
+DB = { posts: { 1 => { title: 'Example Title', body: 'Example body' } } }
 
 # View a single post
 class PostView < Rack::Component

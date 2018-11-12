@@ -105,8 +105,8 @@ RSpec.describe Rack::Component do
     end
 
     it 'does not bust cache based on nested blocks' do
-      Layout = Class.new(Rack::Component::Memoized)
-      first = Layout.call do
+      Outer = Class.new(Rack::Component::Memoized)
+      first = Outer.call do
         @rando.call do
           @rando.call do
             'hi'
@@ -114,7 +114,7 @@ RSpec.describe Rack::Component do
         end
       end
 
-      last = Layout.call do
+      last = Outer.call do
         @rando.call do
           @rando.call do
             'bye'

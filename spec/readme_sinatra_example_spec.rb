@@ -17,10 +17,8 @@ RSpec.describe 'a sinatra example' do
       end
 
       get '/posts/:id' do
-        PostFetcher.(id: params[:id]) do |post|
-          Layout.(title: post[:title]) do
-            PostView.(post)
-          end
+        PostFetcher.call(id: params[:id]) do |post|
+          Layout.call(title: post[:title]) { PostView.call(post) }
         end
       end
     end
@@ -31,7 +29,8 @@ RSpec.describe 'a sinatra example' do
   it('renders the home page') do
     get('/') { |res| expect(res.body).to include('Home') }
   end
+
   it('renders a post') do
-    get('/posts/1') { |res| expect(res.body).to include('Test Post') }
+    get('/posts/1') { |res| expect(res.body).to include('Example Title') }
   end
 end
