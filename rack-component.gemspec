@@ -9,7 +9,7 @@ Gem::Specification.new do |spec|
   spec.email         = ['chris.frank@future.com']
   spec.licenses      = ['MIT']
 
-  spec.summary       = 'Respond to HTTP requests by composing React-style components'
+  spec.summary       = 'Compose declarative, component-based responses to HTTP requests'
   spec.homepage      = 'https://www.github.com/chrisfrank/rack-component'
 
   # Prevent pushing this gem to RubyGems.org. To allow pushes either set the 'allowed_push_host'
