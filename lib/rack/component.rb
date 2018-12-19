@@ -9,7 +9,7 @@ module Rack
     EMPTY = ''.freeze # components render an empty body by default
     attr_reader :props
 
-    # Initialize a new component with the given props and #render() it.
+    # Initialize a new component with the given props and #call() it.
     #
     # @example render a HelloWorld component
     #   class HelloWorld < Rack::Component
@@ -17,22 +17,22 @@ module Rack
     #       props[:world]
     #     end
     #
-    #     def render
+    #     def call
     #       %(<h1>Hello #{world}</h1>)
     #     end
     #   end
     #
     #   MyComponent.call(world: 'Earth') #=> '<h1>Hello Earth</h1>'
-    # @return [String, Object] the rendered component instance
-    def self.call(props = {}, &block)
-      new(props).render(&block)
+    # @return [String, Object] the output of instance#call
+    def self.call(*props, &block)
+      new(*props).render(&block)
     end
 
     def initialize(props = {})
       @props = props
     end
 
-    # Override render to make your component do work.
+    # Override call to make your component do work.
     # @return [String, Object] usually a string, but really whatever
     def render
       block_given? ? yield(self) : EMPTY
@@ -40,7 +40,7 @@ module Rack
 
     # Rack::Component::Memoized is just like Component, only it
     # caches its rendered output in memory and only rerenders
-    # when called with new props or a new block.
+    # when called with new props.
     class Memoized < self
       CACHE_SIZE = 100 # limit cache to 100 keys by default so we don't leak RAM
 
@@ -57,7 +57,7 @@ module Rack
       #       "#{props[:id]} was expensive"
       #     end
       #
-      #     def render
+      #     def call
       #       %(<h1>#{work}</h1>)
       #     end
       #   end
@@ -70,18 +70,18 @@ module Rack
       #   Expensive.call(id: 2) #=> <h1>2 was expensive</h1>
       #
       # @return [String, Object] the cached (or computed) output of render
-      def self.call(props = {}, &block)
-        memoized(props) { super }
+      def self.call(*props, &block)
+        memoized(*props) { super }
       end
 
       # Check the class-level cache, set it to &miss if nil.
       # @return [Object] the output of &miss.call
-      def self.memoized(props, &miss)
-        cache.fetch(key(props), &miss)
+      def self.memoized(*props, &miss)
+        cache.fetch(key(*props), &miss)
       end
 
       # @return [Integer] a cache key for this component
-      def self.key(props)
+      def self.key(*props)
         props.hash
       end
 

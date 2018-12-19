@@ -21,14 +21,34 @@ RSpec.describe Rack::Component do
     end
   end
 
+  it 'lets you override initialize easily' do
+    @comp = Class.new(Rack::Component) do
+      def initialize(id)
+        @id = id
+      end
+
+      def render
+        @id
+      end
+    end
+
+    @comp.call('chris').tap do |res|
+      expect(res).to eq('chris')
+    end
+  end
+
   it 'has access to props when rendering' do
     @comp = Class.new(Rack::Component) do
+      def initialize(props, args)
+        @props = props
+      end
+
       def render
         "#{props[:name]}"
       end
     end
 
-    @comp.call(name: 'Chris').tap do |res|
+    @comp.call({ name: 'Chris'}, value: 'jim').tap do |res|
       expect(res).to eq('Chris')
     end
   end
@@ -37,7 +57,7 @@ RSpec.describe Rack::Component do
     require 'json'
     @comp = Class.new(Rack::Component) do
       def render
-        props.to_json
+        @props.to_json
       end
     end
 
@@ -46,7 +66,7 @@ RSpec.describe Rack::Component do
     end
   end
 
-  it 'can yield to nested components of any arity' do
+  it 'can yield to nested blocks of any arity' do
     @comp = Class.new(Rack::Component) do
       def hi() 'hi' end
 
@@ -75,6 +95,24 @@ RSpec.describe Rack::Component do
       end
     end
 
+    it 'works with components that have overriden initialize' do
+      comp = Class.new(Rack::Component::Memoized) do
+        def initialize(id, name)
+          @id = id
+          @name = name
+        end
+
+        def render
+          SecureRandom.uuid
+        end
+      end
+
+      comp.call(1, "chris").tap do |output|
+        expect(comp.call(1, "chris")).to eq(output)
+        expect(comp.call(2, "chris")).not_to eq(output)
+      end
+    end
+
     it 'limits the cache size to 100 keys by default' do
       (0..200).map { |key| @rando.call(key) }
       @rando.cache.store.tap do |store|
@@ -98,9 +136,9 @@ RSpec.describe Rack::Component do
       end
     end
 
-    it 'busts cache based on block' do
-      @rando.call do |uuid|
-        expect(@rando.call { 'children' }).not_to eq(uuid)
+    it 'does not bust cache based on block' do
+      @rando.call.tap do |uuid|
+        expect(@rando.call { 'children' }).to eq(uuid)
       end
     end
 
