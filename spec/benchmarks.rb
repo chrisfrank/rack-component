@@ -34,8 +34,8 @@ Benchmark.ips do |bm|
   bm.report('Component') do
     Comp.call @model
   end
-#
-#  bm.report('Component::Memoized') do
-#    MemoComp.call @model
-#  end
+
+  bm.report('Component::Memoized') do
+    MemoComp.call @model
+  end
 end
