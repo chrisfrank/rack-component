@@ -88,7 +88,7 @@ module Rack
       # Clear the cache of each descendant class.
       # Generally you'll call this on Rack::Component::Memoized directly.
       # @example Clear all caches:
-      #   Rack::Component::Memoized.flush_caches
+      #   Rack::Component::Memoized.clear_caches
       def self.clear_caches
         ObjectSpace.each_object(singleton_class) do |descendant|
           descendant.cache.flush

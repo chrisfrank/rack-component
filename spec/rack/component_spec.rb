@@ -41,8 +41,8 @@ RSpec.describe Rack::Component do
       end
     end
 
-    @comp.call(captain: 'kirk') do |res|
-      expect(JSON.parse(res.to_s).first.fetch('rank')).to eq('captain')
+    @comp.call(captain: 'kirk').tap do |res|
+      expect(JSON.parse(res).fetch('captain')).to eq('kirk')
     end
   end
 
@@ -133,9 +133,9 @@ RSpec.describe Rack::Component do
         @alt.call
       end
 
-      it 'flushes children and descendants' do
+      it 'flushes itself and its descendants' do
         Rack::Component::Memoized.clear_caches
-        [@rando, @alt].each do |comp|
+        [@rando, @alt, Rack::Component::Memoized].each do |comp|
           expect(comp.cache.store.empty?).to eq(true)
         end
       end
