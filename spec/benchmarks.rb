@@ -11,15 +11,27 @@ Benchmark.ips do |bm|
   ERB_TEMPLATE = '<%= @model.key %>'
   @model = Model.new(SecureRandom.uuid)
 
+  Fn = lambda do |model|
+    model.key
+  end
+
   Comp = Class.new(Rack::Component) do
+    def initialize(model)
+      @key = model.key
+    end
+
     def render
-      %(#{props.key})
+      @key
     end
   end
 
   MemoComp = Class.new(Rack::Component::Memoized) do
+    def initialize(model)
+      @key = model.key
+    end
+
     def render
-      %(#{props.key})
+      @key
     end
   end
 
@@ -31,6 +43,9 @@ Benchmark.ips do |bm|
 #    TILT_TEMPLATE.render(@model)
 #  end
 #
+  bm.report('Lambda') do
+    Fn.call @model
+  end
   bm.report('Component') do
     Comp.call @model
   end

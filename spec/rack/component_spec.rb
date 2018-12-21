@@ -3,18 +3,18 @@ require 'pry'
 require 'securerandom'
 
 RSpec.describe Rack::Component do
-  it 'renders children by default' do
+  it 'renders children by default when passed a block' do
     Rack::Component.call { 'child node' }.tap do |res|
       expect(res).to eq('child node')
     end
   end
 
-  it 'can yield to nested components' do
-    @comp = Class.new(Rack::Component) do
-      def render
-        yield
-      end
-    end
+  it 'returns self by default with no block' do
+    expect(Rack::Component.call).to be_a(Rack::Component)
+  end
+
+  it 'yields to nested blocks' do
+    @comp = Class.new(Rack::Component)
 
     @comp.call { 'nested' }.tap do |res|
       expect(res).to include('nested')
@@ -37,25 +37,13 @@ RSpec.describe Rack::Component do
     end
   end
 
-  it 'has access to props when rendering' do
+  it 'renders json swimmingly' do
+    require 'json'
     @comp = Class.new(Rack::Component) do
-      def initialize(props, args)
+      def initialize(props)
         @props = props
       end
 
-      def render
-        "#{props[:name]}"
-      end
-    end
-
-    @comp.call({ name: 'Chris'}, value: 'jim').tap do |res|
-      expect(res).to eq('Chris')
-    end
-  end
-
-  it 'can render json' do
-    require 'json'
-    @comp = Class.new(Rack::Component) do
       def render
         @props.to_json
       end
@@ -66,7 +54,7 @@ RSpec.describe Rack::Component do
     end
   end
 
-  it 'can yield to nested blocks of any arity' do
+  it 'yields to nested blocks of any arity' do
     @comp = Class.new(Rack::Component) do
       def hi() 'hi' end
 
@@ -83,6 +71,10 @@ RSpec.describe Rack::Component do
   describe Rack::Component::Memoized do
     before do
       @rando = Class.new(Rack::Component::Memoized) do
+        def initialize(key = nil)
+          @key = key
+        end
+
         def render
           SecureRandom.uuid
         end
@@ -120,9 +112,12 @@ RSpec.describe Rack::Component do
       end
     end
 
-    it 'can change the cache size' do
+    it 'overrides the cache size via a CACHE_SIZE constant' do
       class Tiny < Rack::Component::Memoized
         CACHE_SIZE = 50
+        def initialize(key)
+          @key = key
+        end
       end
       (0..200).map { |key| Tiny.call(key) }
       Tiny.cache.store.tap do |store|
@@ -140,27 +135,6 @@ RSpec.describe Rack::Component do
       @rando.call.tap do |uuid|
         expect(@rando.call { 'children' }).to eq(uuid)
       end
-    end
-
-    it 'does not bust cache based on nested blocks' do
-      Outer = Class.new(Rack::Component::Memoized)
-      first = Outer.call do
-        @rando.call do
-          @rando.call do
-            'hi'
-          end
-        end
-      end
-
-      last = Outer.call do
-        @rando.call do
-          @rando.call do
-            'bye'
-          end
-        end
-      end
-
-      expect(first).to eq(last)
     end
 
     describe 'flushing the entire component cache' do
