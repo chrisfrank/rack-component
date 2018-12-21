@@ -77,7 +77,7 @@ class Fetcher < Rack::Component
   end
 
   def render
-    @response
+    yield @response
   end
 end
 
@@ -89,7 +89,7 @@ class JSONFeedParser < Rack::Component
   end
 
   def render
-    @items
+    yield @items
   end
 end
 
@@ -116,6 +116,7 @@ Fetcher.call(uri: 'https://daringfireball.net/feeds/json') do |data|
   JSONFeedParser.call(data) do |items|
     PostsList.call(posts: items, style: 'background-color: red')
   end
+end
 end
 #=> A <ul> full of headlines from Daring Fireball
 

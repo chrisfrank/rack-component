@@ -68,6 +68,34 @@ RSpec.describe Rack::Component do
     end
   end
 
+  describe 'Exposures' do
+    Greeter = Class.new(Rack::Component) do
+      def exposures
+        "Hi!"
+      end
+    end
+
+    Messenger = Class.new(Rack::Component) do
+      def initialize(msg)
+        @msg = msg
+      end
+
+      def render
+        @msg
+      end
+    end
+
+    it 'returns #exposures when not chained' do
+      expect(Greeter.call).to eq("Hi!")
+    end
+
+    it 'Yields #exposures to the next block when chained' do
+      Greeter.call { |hi| Messenger.call(hi) }.tap do |result|
+        expect(result).to eq("Hi!")
+      end
+    end
+  end
+
   describe Rack::Component::Memoized do
     before do
       @rando = Class.new(Rack::Component::Memoized) do

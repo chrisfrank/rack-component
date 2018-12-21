@@ -26,10 +26,20 @@ module Rack
       new(*args).render(&block)
     end
 
-    # Override render to make your component do work.
+    # Override either #render or #exposures to make your component do work.
+    # By default, the behavior of #render depends on whether you call the
+    # component with a block or not: it either returns #exposures or yields to
+    # the block with #exposures as arguments.
+    #
     # @return [String, Object] usually a string, but really whatever
     def render
-      block_given? ? yield(self) : self
+      block_given? ? yield(exposures) : exposures
+    end
+
+    # Override #exposures to keep the default yield-or-return behavior
+    # of #render, but change what gets yielded or returned
+    def exposures
+      self
     end
 
     # Rack::Component::Memoized is just like Component, only it
