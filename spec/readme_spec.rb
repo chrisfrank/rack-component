@@ -8,11 +8,12 @@ RSpec.describe 'the example from the README' do
     class Fetcher < Rack::Component
       require 'net/http'
       def initialize(uri:)
+        super
         @response = Net::HTTP.get(URI(uri))
       end
 
-      def render
-        yield @response
+      render do |env, children|
+        children.call(@response)
       end
     end
 
@@ -20,22 +21,24 @@ RSpec.describe 'the example from the README' do
     class JSONFeedParser < Rack::Component
       require 'json'
       def initialize(data)
+        super
         @items = JSON.parse(data).fetch('items')
       end
 
-      def render
-        yield @items
+      render do |env, children|
+        children.call @items
       end
     end
 
     # Render an HTML list of posts
     class PostsList < Rack::Component
       def initialize(posts:, style: '')
+        super
         @posts = posts
         @style = style
       end
 
-      def render
+      render do
         <<~HTML
           <ul style="#{@style}">
             #{@posts.map(&ListItem).join}"

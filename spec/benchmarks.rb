@@ -16,22 +16,14 @@ Benchmark.ips do |bm|
   end
 
   Comp = Class.new(Rack::Component) do
-    def initialize(model)
-      @key = model.key
-    end
-
-    def render
-      @key
+    render do
+      env.key
     end
   end
 
   MemoComp = Class.new(Rack::Component::Memoized) do
-    def initialize(model)
-      @key = model.key
-    end
-
-    def render
-      @key
+    render do
+      env.key
     end
   end
 

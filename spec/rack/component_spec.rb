@@ -9,7 +9,7 @@ RSpec.describe Rack::Component do
     end
   end
 
-  it 'returns self by default with no block' do
+  it 'returns self by default when render is not defined' do
     expect(Rack::Component.call).to be_a(Rack::Component)
   end
 
@@ -27,7 +27,7 @@ RSpec.describe Rack::Component do
         @id = id
       end
 
-      def render
+      render do
         @id
       end
     end
@@ -40,12 +40,8 @@ RSpec.describe Rack::Component do
   it 'renders json swimmingly' do
     require 'json'
     @comp = Class.new(Rack::Component) do
-      def initialize(props)
-        @props = props
-      end
-
-      def render
-        @props.to_json
+      render do
+        env.to_json
       end
     end
 
@@ -54,129 +50,83 @@ RSpec.describe Rack::Component do
     end
   end
 
-  it 'yields to nested blocks of any arity' do
-    @comp = Class.new(Rack::Component) do
-      def hi() 'hi' end
-
-      def render
-        yield(self, 'this', 'that')
-      end
-    end
-
-    @comp.call { |scope, x, y| [scope.hi, x, y].join(' ') }.tap do |res|
-      expect(res).to eq('hi this that')
-    end
-  end
-
-  describe 'Exposures' do
-    Greeter = Class.new(Rack::Component) do
-      def exposures
-        "Hi!"
-      end
-    end
-
-    Messenger = Class.new(Rack::Component) do
-      def initialize(msg)
-        @msg = msg
-      end
-
-      def render
-        @msg
-      end
-    end
-
-    it 'returns #exposures when not chained' do
-      expect(Greeter.call).to eq("Hi!")
-    end
-
-    it 'Yields #exposures to the next block when chained' do
-      Greeter.call { |hi| Messenger.call(hi) }.tap do |result|
-        expect(result).to eq("Hi!")
-      end
-    end
-  end
-
-  describe Rack::Component::Memoized do
+  describe 'cached' do
     before do
-      @rando = Class.new(Rack::Component::Memoized) do
-        def initialize(key = nil)
-          @key = key
-        end
-
-        def render
+      @rando = Class.new(Rack::Component) do
+        render do
           SecureRandom.uuid
         end
       end
     end
 
     it 'caches identical calls' do
-      @rando.call.tap do |uuid|
-        expect(@rando.call).to eq(uuid)
+      @rando.cached.tap do |uuid|
+        expect(@rando.cached).to eq(uuid)
       end
     end
 
     it 'works with components that have overriden initialize' do
-      comp = Class.new(Rack::Component::Memoized) do
-        def initialize(id, name)
+      comp = Class.new(Rack::Component) do
+        def initialize(id:, name:)
           @id = id
           @name = name
         end
 
-        def render
+        render do
           SecureRandom.uuid
         end
       end
 
-      comp.call(1, "chris").tap do |output|
-        expect(comp.call(1, "chris")).to eq(output)
-        expect(comp.call(2, "chris")).not_to eq(output)
+      comp.cached(id: 1, name: "chris").tap do |output|
+        expect(comp.cached(id: 1, name: "chris")).to eq(output)
+        expect(comp.cached(id: 2, name: "chris")).not_to eq(output)
       end
     end
 
     it 'limits the cache size to 100 keys by default' do
-      (0..200).map { |key| @rando.call(key) }
-      @rando.cache.store.tap do |store|
+      (0..200).map { |key| @rando.cached(key) }
+      @rando.send(:cache).store.tap do |store|
         expect(store.length).to eq(100)
       end
     end
 
     it 'overrides the cache size via a CACHE_SIZE constant' do
-      class Tiny < Rack::Component::Memoized
+      class Tiny < Rack::Component
         CACHE_SIZE = 50
-        def initialize(key)
-          @key = key
-        end
+        render { "meh" }
       end
-      (0..200).map { |key| Tiny.call(key) }
-      Tiny.cache.store.tap do |store|
+      (0..200).map { |key| Tiny.cached(key) }
+      Tiny.send(:cache).store.tap do |store|
         expect(store.length).to eq(50)
       end
     end
 
     it 'busts cache based on props' do
-      @rando.call.tap do |uuid|
-        expect(@rando.call(1)).not_to eq(uuid)
+      @rando.cached.tap do |uuid|
+        expect(@rando.cached(1)).not_to eq(uuid)
       end
     end
 
     it 'does not bust cache based on block' do
-      @rando.call.tap do |uuid|
-        expect(@rando.call { 'children' }).to eq(uuid)
+      @rando.cached.tap do |uuid|
+        expect(@rando.cached { 'children' }).to eq(uuid)
       end
     end
 
     describe 'flushing the entire component cache' do
       before do
         # fill the cache of two memoized components
-        @alt = Class.new(@rando)
-        @rando.call
-        @alt.call
+        @alt = Class.new(@rando) do
+          render { 'etc' }
+        end
+        @rando.cached
+        @alt.cached
       end
 
       it 'flushes itself and its descendants' do
-        Rack::Component::Memoized.clear_caches
-        [@rando, @alt, Rack::Component::Memoized].each do |comp|
-          expect(comp.cache.store.empty?).to eq(true)
+        Rack::Component.flush
+        [@rando, @alt, Rack::Component].each do |comp|
+          expect(comp.send(:cache).store.empty?).to eq(true)
         end
       end
     end
