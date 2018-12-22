@@ -16,13 +16,7 @@ Benchmark.ips do |bm|
   end
 
   Comp = Class.new(Rack::Component) do
-    render do
-      env.key
-    end
-  end
-
-  MemoComp = Class.new(Rack::Component::Memoized) do
-    render do
+    render do |env|
       env.key
     end
   end
@@ -42,7 +36,7 @@ Benchmark.ips do |bm|
     Comp.call @model
   end
 
-  bm.report('Component::Memoized') do
-    MemoComp.call @model
+  bm.report('Component [cached]') do
+    Comp.cached @model
   end
 end

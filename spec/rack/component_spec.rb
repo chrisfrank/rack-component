@@ -3,9 +3,31 @@ require 'pry'
 require 'securerandom'
 
 RSpec.describe Rack::Component do
-  it 'renders children by default when passed a block' do
-    Rack::Component.call { 'child node' }.tap do |res|
-      expect(res).to eq('child node')
+  Fn = proc do |env, &children|
+    <<~HTML
+      <h1>Hello #{env[:name]}</h1>
+      #{children&.call}
+    HTML
+  end
+
+  Comp = Class.new(Rack::Component) do
+    render do |props, &children|
+      <<~HTML
+        <h1>Hello #{env[:name]}</h1>
+        #{children&.call}
+      HTML
+    end
+  end
+
+  describe 'compared to a Proc' do
+    it 'behaves identically without children' do
+      props = { name: 'Chris' }
+      expect(Comp.call(props)).to eq(Fn.call(props))
+    end
+
+    it 'behaves identically with children' do
+      props = { name: 'Chris' }
+      expect(Comp.call(props) { 'child' }).to eq(Fn.call(props) { 'child' })
     end
   end
 
@@ -27,7 +49,7 @@ RSpec.describe Rack::Component do
         @id = id
       end
 
-      render do
+      render do |env|
         @id
       end
     end
@@ -40,7 +62,7 @@ RSpec.describe Rack::Component do
   it 'renders json swimmingly' do
     require 'json'
     @comp = Class.new(Rack::Component) do
-      render do
+      render do |env|
         env.to_json
       end
     end
@@ -53,7 +75,7 @@ RSpec.describe Rack::Component do
   describe 'cached' do
     before do
       @rando = Class.new(Rack::Component) do
-        render do
+        render do |_|
           SecureRandom.uuid
         end
       end
@@ -72,7 +94,7 @@ RSpec.describe Rack::Component do
           @name = name
         end
 
-        render do
+        render do |env|
           SecureRandom.uuid
         end
       end
@@ -93,7 +115,7 @@ RSpec.describe Rack::Component do
     it 'overrides the cache size via a CACHE_SIZE constant' do
       class Tiny < Rack::Component
         CACHE_SIZE = 50
-        render { "meh" }
+        render { |_| "meh" }
       end
       (0..200).map { |key| Tiny.cached(key) }
       Tiny.send(:cache).store.tap do |store|
@@ -117,7 +139,7 @@ RSpec.describe Rack::Component do
       before do
         # fill the cache of two memoized components
         @alt = Class.new(@rando) do
-          render { 'etc' }
+          render { |_| 'etc' }
         end
         @rando.cached
         @alt.cached

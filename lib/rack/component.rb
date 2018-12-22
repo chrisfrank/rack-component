@@ -7,14 +7,8 @@ module Rack
     VERSION = '0.3.0'.freeze
     CACHE_SIZE = 100 # limit cache to 100 keys by default to prevent leaking RAM
     class << self
-      attr_reader :_block
-
-      def render(&block)
-        @_block = block
-      end
-
       def call(env = {}, &children)
-        new(env, &children).instance_exec env, children, &_block
+        new(env).call env, &children
       end
 
       def cached(env = {}, &children)
@@ -39,17 +33,22 @@ module Rack
         @cache ||= ComponentCache.new(const_get(:CACHE_SIZE))
       end
 
-    end
+      def render(&block)
+        define_method :render, &block
 
-    def initialize(env = {}, &children)
-      @env = env
-      @children = children
-    end
-
-    def children(args = self)
-      @children ? @children.call(args) : self
+        define_method :call do |props, &children|
+          render(props, &children)
+        end
+      end
     end
 
     attr_reader :env
+    def initialize(env = {})
+      @env = env
+    end
+
+    def call(env)
+      block_given? ? yield(self) : self
+    end
   end
 end

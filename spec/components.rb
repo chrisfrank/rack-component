@@ -1,11 +1,11 @@
 module Components
   # Find and render a post matching the given id
   class Post < Rack::Component
-    render do
+    render do |env|
       Layout.call(title: record[:title]) do
         PostView.call(record) do
           next_post = PostFetcher.call(id: record[:id] + 1)
-          "Further reading: #{next_post[:title]}"
+          next_post && "Further reading: #{next_post[:title]}"
         end
       end
     end
@@ -32,13 +32,13 @@ module Components
 
   # View a single post
   class PostView < Rack::Component
-    render do |env|
+    render do |env, &children|
       <<~HTML
         <article>
           <h1>#{env[:title]}</h1>
           <p>#{env[:body]}</h1>
           <footer>
-            #{children}
+            #{children&.call}
           </footer>
         </article>
       HTML
@@ -46,7 +46,7 @@ module Components
   end
 
   class Layout < Rack::Component
-    render do
+    render do |env, &children|
       <<~HTML
         <!DOCTYPE html>
         <html>
@@ -54,7 +54,7 @@ module Components
             <title>#{env[:title]}</title>
           </head>
           <body>
-            #{children}
+            #{children.call}
           </body>
         </html>
       HTML

@@ -7,7 +7,7 @@ RSpec.describe 'An app composed of Rack::Components' do
     Class.new(Rack::Component) do
       # Fetch posts, render a layout, then render a post inside the layout,
       # dynamically passing the result of PostFetcher to PostView
-      render do
+      render do |env|
         catch(:halt) { [200, {}, [body]] }
       end
 

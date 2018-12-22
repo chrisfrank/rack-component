@@ -73,11 +73,12 @@ require 'rack/component'
 class Fetcher < Rack::Component
   require 'net/http'
   def initialize(uri:)
+    super
     @response = Net::HTTP.get(URI(uri))
   end
 
-  def render
-    yield @response
+  render do |env, &children|
+    children.call(@response)
   end
 end
 
@@ -85,11 +86,12 @@ end
 class JSONFeedParser < Rack::Component
   require 'json'
   def initialize(data)
+    super
     @items = JSON.parse(data).fetch('items')
   end
 
-  def render
-    yield @items
+  render do |env, &children|
+    children.call @items
   end
 end
 
@@ -100,7 +102,7 @@ class PostsList < Rack::Component
     @style = style
   end
 
-  def render
+  render do |env|
     <<~HTML
       <ul style="#{@style}">
         #{@posts.map(&ListItem).join}"
@@ -116,7 +118,6 @@ Fetcher.call(uri: 'https://daringfireball.net/feeds/json') do |data|
   JSONFeedParser.call(data) do |items|
     PostsList.call(posts: items, style: 'background-color: red')
   end
-end
 end
 #=> A <ul> full of headlines from Daring Fireball
 
