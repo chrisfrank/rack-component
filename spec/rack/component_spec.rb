@@ -3,7 +3,7 @@ require 'pry'
 require 'securerandom'
 
 RSpec.describe Rack::Component do
-  Fn = proc do |env, &children|
+  Fn = proc do |env = {}, &children|
     <<~HTML
       <h1>Hello #{env[:name]}</h1>
       #{children&.call}
@@ -11,7 +11,7 @@ RSpec.describe Rack::Component do
   end
 
   Comp = Class.new(Rack::Component) do
-    render do |props, &children|
+    render do |env, &children|
       <<~HTML
         <h1>Hello #{env[:name]}</h1>
         #{children&.call}
@@ -29,6 +29,43 @@ RSpec.describe Rack::Component do
       props = { name: 'Chris' }
       expect(Comp.call(props) { 'child' }).to eq(Fn.call(props) { 'child' })
     end
+
+    it 'lets you call without arguments' do
+      expect(Fn.call).to eq(Comp.call)
+    end
+  end
+
+  describe 'handling keyword arguments' do
+    it 'supports required args' do
+      comp = Class.new(Rack::Component) { render { |name:| name } }
+      expect(comp.call(name: 'Jean Luc')).to eq('Jean Luc')
+      expect { comp.call }.to raise_error(ArgumentError)
+    end
+
+    it 'supports optional keyword args' do
+      comp = Class.new(Rack::Component) { render { |name: 'Jean Luc'| name } }
+      expect(comp.call).to eq('Jean Luc')
+      expect(comp.call(name: 'Riker')).to eq('Riker')
+    end
+
+    it 'supports a single &block arg' do
+      comp = Class.new(Rack::Component) { render { |_, &children| children.call } }
+      expect(comp.call { "hi" }).to eq('hi')
+    end
+
+    it 'supports no args at all' do
+      comp = Class.new(Rack::Component) { render { |_| 'hi' } }
+      expect(comp.call).to eq('hi')
+      expect(comp.call(jim: 'miller')).to eq('hi')
+    end
+
+    it 'can mix required and optional keywords' do
+      comp = Class.new(Rack::Component) do
+        render { |name:, dept: 'Staff'| "#{name} - #{dept}" }
+      end
+      actual = comp.call(name: 'La Forge', dept: 'Engineering')
+      expect(actual).to eq('La Forge - Engineering')
+    end
   end
 
   it 'returns self by default when render is not defined' do
@@ -44,27 +81,23 @@ RSpec.describe Rack::Component do
   end
 
   it 'lets you override initialize easily' do
-    @comp = Class.new(Rack::Component) do
+    comp = Class.new(Rack::Component) do
       def initialize(id)
         @id = id
       end
 
-      render do |env|
-        @id
-      end
+      render { |env| env }
     end
-
-    @comp.call('chris').tap do |res|
-      expect(res).to eq('chris')
-    end
+    instance = comp.new(1)
+    expect(instance.instance_variable_get(:@env)).to be(nil)
+    expect(instance.instance_variable_get(:@id)).to be(1)
+    expect(instance.call(2)).to eq(2)
   end
 
   it 'renders json swimmingly' do
     require 'json'
     @comp = Class.new(Rack::Component) do
-      render do |env|
-        env.to_json
-      end
+      render { |env| env.to_json }
     end
 
     @comp.call(captain: 'kirk').tap do |res|
@@ -75,9 +108,7 @@ RSpec.describe Rack::Component do
   describe 'cached' do
     before do
       @rando = Class.new(Rack::Component) do
-        render do |_|
-          SecureRandom.uuid
-        end
+        render { |_| SecureRandom.uuid }
       end
     end
 
@@ -94,9 +125,7 @@ RSpec.describe Rack::Component do
           @name = name
         end
 
-        render do |env|
-          SecureRandom.uuid
-        end
+        render { |_| SecureRandom.uuid }
       end
 
       comp.cached(id: 1, name: "chris").tap do |output|

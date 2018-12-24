@@ -23,7 +23,7 @@ module Rack
 
       def warm(*keys)
         ObjectSpace.each_object(singleton_class) do |descendant|
-          Array(keys).map { |key| descendant.call(key) }
+          keys.map { |key| descendant.call(key) }
         end
       end
 
@@ -35,10 +35,14 @@ module Rack
 
       def render(&block)
         define_method :render, &block
+        return if actually_zero_arity?(block)
 
-        define_method :call do |props, &children|
-          render(props, &children)
-        end
+        define_method(:call) { |env, &children| render(env, &children) }
+      end
+
+      def actually_zero_arity?(block)
+        first_param_type, _name = block.parameters.first
+        block.arity.zero? && [nil, :block].include?(first_param_type)
       end
     end
 
@@ -47,7 +51,11 @@ module Rack
       @env = env
     end
 
-    def call(env)
+    def call(*)
+      block_given? ? render(&Proc.new) : render
+    end
+
+    def render
       block_given? ? yield(self) : self
     end
   end

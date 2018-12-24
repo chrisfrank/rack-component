@@ -3,6 +3,9 @@ detectors:
     enabled: false
   UncommunicativeVariableName:
     enabled: false
+  NestedIterators:
+    ignore_iterators:
+      - each_object
 exclude_paths:
   - bin
   - client
