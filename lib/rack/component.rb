@@ -34,15 +34,7 @@ module Rack
       end
 
       def render(&block)
-        define_method :render, &block
-        return if actually_zero_arity?(block)
-
-        define_method(:call) { |env, &children| render(env, &children) }
-      end
-
-      def actually_zero_arity?(block)
-        first_param_type, _name = block.parameters.first
-        block.arity.zero? && [nil, :block].include?(first_param_type)
+        define_method :call, &block
       end
     end
 
@@ -52,10 +44,6 @@ module Rack
     end
 
     def call(*)
-      block_given? ? render(&Proc.new) : render
-    end
-
-    def render
       block_given? ? yield(self) : self
     end
   end
