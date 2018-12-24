@@ -1,11 +1,10 @@
+require_relative 'component/version'
 require_relative 'component/component_cache'
 
 module Rack
   # Subclass Rack::Component to compose declarative, component-based responses
   # to HTTP requests
   class Component
-    VERSION = '0.3.0'.freeze
-    CACHE_SIZE = 100 # limit cache to 100 keys by default to prevent leaking RAM
     class << self
       def call(env = {}, &children)
         new(env).call env, &children

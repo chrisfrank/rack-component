@@ -1,5 +1,7 @@
 module Rack
   class Component
+    CACHE_SIZE = 100 # limit cache to 100 keys by default to prevent leaking RAM
+
     # Threadsafe in-memory cache
     class ComponentCache
       attr_reader :store
