@@ -1,18 +1,14 @@
 module Rack
   class Component
-    CACHE_SIZE = 100 # limit cache to 100 keys by default to prevent leaking RAM
-
     # Threadsafe in-memory cache
-    class ComponentCache
-      attr_reader :store
-
-      # Initialize a mutex for threadsafe reads and writes
-      LOCK = Mutex.new
+    class MemoryCache
+      attr_reader :store, :mutex
 
       # Store cache in a hash
-      def initialize(limit = 100)
+      def initialize(length: 100)
         @store = {}
-        @limit = limit
+        @length = length
+        @mutex = Mutex.new
       end
 
       # Fetch a key from the cache, if it exists
@@ -20,28 +16,28 @@ module Rack
       # @return the cached value
       def fetch(key)
         store.fetch(key) do
-          write(key, yield) if block_given?
+          set(key, yield) if block_given?
         end
       end
 
       # empty the cache
       # @return [Hash] the empty store
       def flush
-        LOCK.synchronize { @store = {} }
+        mutex.synchronize { @store = {} }
       end
 
       private
 
       # Cache a value and return it
-      def write(key, value)
-        LOCK.synchronize do
+      def set(key, value)
+        mutex.synchronize do
           store[key] = value
-          store.delete(@store.keys.first) if store.length > @limit
+          store.delete(@store.keys.first) if store.length > @length
           value
         end
       end
     end
 
-    private_constant :ComponentCache
+    private_constant :MemoryCache
   end
 end

@@ -56,14 +56,14 @@ RSpec.describe Rack::Component do
   end
 
   describe 'without a render block' do
-    it 'returns self by default' do
-      expect(Rack::Component.call).to be_a(Rack::Component)
+    it 'returns its env by default' do
+      expect(Rack::Component.call).to eq({})
     end
 
     it 'yields self when called with a block' do
       @comp = Class.new(Rack::Component)
 
-      @comp.call(1) { |instance| "Hi from comp #{instance.env}" }.tap do |res|
+      @comp.call(1) { |env| "Hi from comp #{env}" }.tap do |res|
         expect(res).to eq('Hi from comp 1')
       end
     end
@@ -130,9 +130,9 @@ RSpec.describe Rack::Component do
       end
     end
 
-    it 'overrides the cache size via a CACHE_SIZE constant' do
+    it 'overrides the cache size by calling class#cache with a block' do
       class Tiny < Rack::Component
-        CACHE_SIZE = 50
+        cache { MemoryCache.new(length: 50) }
         render { |_| "meh" }
       end
       (0..200).map { |key| Tiny.cached(key) }
@@ -153,22 +153,15 @@ RSpec.describe Rack::Component do
       end
     end
 
-    describe 'flushing the entire component cache' do
-      before do
-        # fill the cache of two memoized components
-        @alt = Class.new(@rando) do
-          render { |_| 'etc' }
-        end
-        @rando.cached
-        @alt.cached
-      end
+    it 'flushes itself on #flush' do
+      @rando.cached
+      @rando.flush
+      expect(@rando.send(:cache).store.empty?).to eq(true)
+    end
 
-      it 'flushes itself and its descendants' do
-        Rack::Component.flush
-        [@rando, @alt, Rack::Component].each do |comp|
-          expect(comp.send(:cache).store.empty?).to eq(true)
-        end
-      end
+    it 'warms itself on #warm' do
+      @rando.warm(*%w[this that another])
+      expect(@rando.send(:cache).store.length).to eq(3)
     end
   end
 end

@@ -1,5 +1,5 @@
 require_relative 'component/version'
-require_relative 'component/component_cache'
+require_relative 'component/memory_cache'
 
 module Rack
   # Subclass Rack::Component to compose declarative, component-based responses
@@ -15,35 +15,32 @@ module Rack
       end
 
       def flush
-        ObjectSpace.each_object(singleton_class) do |descendant|
-          descendant.send(:cache).flush
-        end
+        cache.flush
       end
 
       def warm(*keys)
-        ObjectSpace.each_object(singleton_class) do |descendant|
-          keys.map { |key| descendant.call(key) }
-        end
+        keys.map { |key| cached(key) }
       end
 
       private
 
-      def cache
-        @cache ||= ComponentCache.new(const_get(:CACHE_SIZE))
-      end
-
       def render(&block)
         define_method :call, &block
       end
+
+      def cache
+        @cache ||= (block_given? ? yield : MemoryCache.new(length: 100))
+      end
     end
 
-    attr_reader :env
     def initialize(env = {})
       @env = env
     end
 
     def call(*)
-      block_given? ? yield(self) : self
+      block_given? ? yield(env) : env
     end
+
+    attr_reader :env
   end
 end
