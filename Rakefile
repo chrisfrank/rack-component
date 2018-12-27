@@ -4,15 +4,20 @@ require 'rspec/core/rake_task'
 RSpec::Core::RakeTask.new(:spec)
 
 task :cop do
-  system 'bundle exec rubocop lib'
+  sh 'bundle exec rubocop lib'
 end
 
 task :reek do
-  system 'bundle exec reek lib'
+  sh 'bundle exec reek lib'
 end
 
 task :doc do
-  system 'bundle exec yard doc'
+  sh 'bundle exec yard doc'
+end
+
+task :commit do
+  sh 'bundle exec rake'
+  sh 'git add -A && git commit --verbose'
 end
 
 task default: %i[cop reek spec doc]
