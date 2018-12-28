@@ -3,125 +3,205 @@
 Like a React.js component, a `Rack::Component` implements a `render` method that
 takes input data and returns what to display.
 
-You can combine Components to build complex features out of simple, easily
-testable units.
-
-## Installation
-
-Add this line to your application's Gemfile:
-
+## In your Gemfile:
 ```ruby
 gem 'rack-component', require: 'rack/component'
 ```
 
-And then execute:
+## Getting Started
 
-    $ bundle
+1. The simplest component is just a function:
+    ```ruby
+    Greeter = lambda do |env|
+      "<h1>Hello, #{env[:name]}.</h1>"
+    end
 
-Or install it yourself as:
+    Greeter.call(name: 'James') #=> '<h1>Hello, James.</h1>'
+    ```
+2. Convert your function to a `Rack::Component` to supercharge it:
+    ```ruby
+    require 'rack/component'
+    class FormalGreeter < Rack::Component
+      render do |env|
+        "<h1>Hello, #{title} #{env[:name]}.</h1>"
+      end
 
-    $ gem install rack-component
+      def title
+        # the hash you pass to `call` is available as `env` in
+        # your component's instance methods
+        env[:title] || "President"
+      end
+    end
 
-## API Reference
+    FancyGreeter.call(name: 'Macron') #=> "<h1>Hello, President Macron.</h1>"
+    FancyGreeter.call(name: 'Merkel', title: 'Chancellor) #=> "<h1>Hello, Chancellor Merkel.</h1>"
+    ```
 
-Please see the
-[YARD docs on rubydoc.info](https://www.rubydoc.info/gems/rack-component)
+3. Replace `#call` with `#memoized` to make re-renders instant:
+    ```ruby
+    require 'rack/component'
+    require 'net/http'
+    class NetworkGreeter < Rack::Component
+      render do |env|
+        "Hello, #{get_job_title_from_api} #{env[:name]}."
+      end
 
-## Usage
+      def get_job_title_from_api
+        endpoint = URI("http://api.heads-of-state.gov/")
+        Net::HTTP.get("#{endpoint}?q=#{env[:name]}")
+      end
+    end
 
-Subclass `Rack::Component` and `#call` it:
+    NetworkGreeter.memoized(name: 'Macron')
+    # ...after a slow network call to our fictional Heads Of State API
+    #=> "Hello, President Macron."
+
+    NetworkGreeter.memoized(name: 'Macron') # subsequent calls with the same env are instant.
+    #=> "Hello, President Macron."
+
+    NetworkGreeter.memoized(name: 'Merkel')
+    # ...this env is new, so NetworkGreeter makes another network call
+    #=> "Hello, Chancellor Merkel."
+
+    NetworkGreeter.memoized(name: 'Merkel') #=> instant! "Hello, Chancellor Merkel."
+    NetworkGreeter.memoized(name: 'Macron') #=> instant! "Hello, President Macron."
+    ```
+
+## Recipes
+
+### Render a content Component inside a layout Component:
+You can nest Rack::Components as if they were [React Children][JSX Children] by
+calling your components with a block:
 
 ```ruby
 require 'rack/component'
-class Useless < Rack::Component
+
+# let's say this is a Sinatra app:
+get '/posts/:id' do
+  PostPage.call(id: params[:id])
 end
 
-Useless.call #=> the output Useless.new.render
-```
+# fetch a post from the database and render it inside a layout
+class PostPage < Rack::Component
+  render do |env|
+    post = Post.find(id: env[:id])
+    Layout.call(title: post.title) do
+      PostView.call(title: post.title, body: post.body)
+    end
+  end
+end
 
-The default implementation of `#render` is to yield the component instance to
-whatever block you pass to `Component.call`, like this:
-
-```ruby
-Useless.call { |instance| "Hello from #{instance}" }
-#=> "Hello from #<Useless:0x00007fcaba87d138>"
-
-Useless.call do |instance|
-  Useless.call do |second_instance|
+class PostView < Rack::Component
+  render do |env|
     <<~HTML
-      <h1>Hello from #{instance}</h1>
-      <p>And also from #{second_instance}"</p>
+      <article>
+        <h1>#{env[:title]}</h1>
+        #{env[:body]}
+      </article>
     HTML
   end
 end
-# =>
-# <h1>Hello from #<Useless:0x00007fcaba87d138></h1>
-# <p>And also from #<Useless:0x00007f8482802498></p>
+
+class Layout < Rack::Component
+  render do |env, &children|
+    <<~HTML
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>#{env[:title]}</title>
+        </head>
+        <body>
+          #{children.call}
+        </body>
+      </html>
+    HTML
+  end
+end
 ```
 
-### Implement `#render` or add instance methods to make Components do work
-
-Peruse the [specs][specs] for examples of component chains that handle
-data fetching, views, and error handling in Sinatra and raw Rack.
-
-Here's a component chain that prints headlines from Daring Fireball’s JSON feed:
+### Render an HTML list from an array
+[JSX Lists] use JavaScript's `map` function. Rack::Component does likewise.
 
 ```ruby
 require 'rack/component'
-
-# Make a network request and return the response
-class Fetcher < Rack::Component
-  require 'net/http'
-  def initialize(uri:)
-    super
-    @response = Net::HTTP.get(URI(uri))
-  end
-
-  render do |env, &children|
-    children.call(@response)
-  end
-end
-
-# Parse items from a JSON Feed document
-class JSONFeedParser < Rack::Component
-  require 'json'
-  def initialize(data)
-    super
-    @items = JSON.parse(data).fetch('items')
-  end
-
-  render do |env, &children|
-    children.call @items
-  end
-end
-
-# Render an HTML list of posts
 class PostsList < Rack::Component
-  def initialize(posts:, style: '')
-    @posts = posts
-    @style = style
-  end
-
   render do |env|
     <<~HTML
-      <ul style="#{@style}">
-        #{@posts.map(&ListItem).join}"
+      <h1>This is a list of posts</h1>
+      <ul>
+        #{render_items}
       </ul>
     HTML
   end
 
-  ListItem = ->(post) { "<li>#{post['title']}</li>" }
-end
-
-# Fetch JSON Feed data from daring fireball, parse it, render a list
-Fetcher.call(uri: 'https://daringfireball.net/feeds/json') do |data|
-  JSONFeedParser.call(data) do |items|
-    PostsList.call(posts: items, style: 'background-color: red')
+  def render_items
+    env[:posts].map { |post|
+      <<~HTML
+        <li class="item">
+          <a href="#{post[:url]}>
+            #{post[:name]}
+          </a>
+        </li>
+      HTML
+    }.join
   end
 end
-#=> A <ul> full of headlines from Daring Fireball
+
+posts = [{ name: 'First Post', id: 1 }, { name: 'Second', id: 2 }]
+PostsList.call(posts: posts) #=> <h1>This is a list of posts</h1> <ul>...etc
+```
+
+## API Reference
+The full API reference is available here:
+
+https://www.rubydoc.info/gems/rack-component
+
+For info on how to clear or change the size of the memoziation cache, please see
+[the spec][spec].
+
+## Performance
+On my machine, Rendering a Rack::Component is almost 10x faster than rendering a
+comparable Tilt template, and almost 100x faster than ERB from the Ruby standard
+library. Run `ruby spec/benchmarks.rb` to see what to expect in your env.
 
 ```
+$ ruby spec/benchmarks.rb
+Warming up --------------------------------------
+     Ruby stdlib ERB     2.807k i/100ms
+       Tilt (cached)    28.611k i/100ms
+              Lambda   249.958k i/100ms
+           Component   161.176k i/100ms
+Component [memoized]    94.586k i/100ms
+Calculating -------------------------------------
+     Ruby stdlib ERB     29.296k (± 2.0%) i/s -    148.771k in   5.080274s
+       Tilt (cached)    319.935k (± 2.8%) i/s -      1.602M in   5.012009s
+              Lambda      6.261M (± 1.2%) i/s -     31.495M in   5.031302s
+           Component      2.773M (± 1.8%) i/s -     14.022M in   5.057528s
+Component [memoized]      1.276M (± 0.9%) i/s -      6.432M in   5.041348s
+```
+
+Notice that using `Component#memoized` is *slower* than using `Component#call`
+in this benchmark. Because these components do almost nothing, it's more work to
+check the memoziation cache than to just render. For components that don't
+access a database, don't do network I/O, and aren't very CPU-intensive, it's
+probably fastest not to memoize. For components that do I/O, using `#memoize`
+can speed things up by several orders of magnitude.
+
+## Anybody using this in production?
+
+Aye:
+
+- [future.com](https://www.future.com/)
+- [Seattle & King County Homelessness Response System](https://hrs.kc.future.com/)
+
+## Ruby reference:
+
+Where React uses [JSX] to make components more ergonomic, Rack::Component
+uses the ergonomics built into Ruby, specifically:
+
+- [Heredocs]
+- [String Interpolation]
+- [Calling methods with a block][Ruby Blocks]
 
 ## Development
 
@@ -144,4 +224,10 @@ https://github.com/chrisfrank/rack-component.
 
 MIT
 
-[specs]: https://github.com/chrisfrank/rack-component/tree/master/spec
+[spec]: https://github.com/chrisfrank/rack-component/blob/master/spec/rack/component_spec.rb
+[JSX]: https://reactjs.org/docs/introducing-jsx.html
+[JSX Children]: https://reactjs.org/docs/composition-vs-inheritance.html
+[JSX Lists]: https://reactjs.org/docs/lists-and-keys.html
+[Heredocs]: https://ruby-doc.org/core-2.5.0/doc/syntax/literals_rdoc.html#label-Here+Documents
+[String Interpolation]: http://ruby-for-beginners.rubymonstas.org/bonus/string_interpolation.html
+[Ruby Blocks]: https://mixandgo.com/learn/mastering-ruby-blocks-in-less-than-5-minutes

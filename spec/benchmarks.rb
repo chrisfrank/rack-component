@@ -19,14 +19,14 @@ Benchmark.ips do |bm|
     render { |env| env.key }
   end
 
-#  bm.report('Ruby stdlib ERB') do
-#    ERB.new(ERB_TEMPLATE).result(binding)
-#  end
-#
-#  bm.report('Tilt (cached)') do
-#    TILT_TEMPLATE.render(@model)
-#  end
-#
+  bm.report('Ruby stdlib ERB') do
+    ERB.new(ERB_TEMPLATE).result(binding)
+  end
+
+  bm.report('Tilt (cached)') do
+    TILT_TEMPLATE.render(@model)
+  end
+
   bm.report('Lambda') do
     Fn.call @model
   end
@@ -34,7 +34,7 @@ Benchmark.ips do |bm|
     Comp.call @model
   end
 
-  bm.report('Component [cached]') do
-    Comp.cached @model
+  bm.report('Component [memoized]') do
+    Comp.memoized @model
   end
 end

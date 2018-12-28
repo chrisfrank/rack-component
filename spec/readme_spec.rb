@@ -1,60 +1,86 @@
 require 'spec_helper'
 
-RSpec.describe 'the example from the README' do
-  let(:docs) do
-    require 'rack/component'
-
-    # Make a network request and return the response
-    class Fetcher < Rack::Component
-      require 'net/http'
-      def initialize(uri:)
-        super
-        @response = Net::HTTP.get(URI(uri))
-      end
-
-      render do |env, &children|
-        children.call(@response)
-      end
+RSpec.describe 'Examples from the README' do
+  it 'starts with a plain function' do
+    Greeter = lambda do |env|
+      "<h1>Hello, #{env[:name]}.</h1>"
     end
 
-    # Parse items from a JSON Feed document
-    class JSONFeedParser < Rack::Component
-      require 'json'
-      def initialize(data)
-        super
-        @items = JSON.parse(data).fetch('items')
-      end
-
-      render do |env, &children|
-        children.call @items
-      end
-    end
-
-    # Render an HTML list of posts
-    class PostsList < Rack::Component
-      def initialize(posts:, style: '')
-        @posts = posts
-        @style = style
-      end
-
-      render do |env|
-        <<~HTML
-          <ul style="#{@style}">
-            #{@posts.map(&ListItem).join}"
-          </ul>
-        HTML
-      end
-
-      ListItem = ->(post) { "<li>#{post['title']}</li>" }
-    end
-
-    # Fetch JSON Feed data from daring fireball, parse it, render a list
-    Fetcher.call(uri: 'https://daringfireball.net/feeds/json') do |data|
-      JSONFeedParser.call(data) do |items|
-        PostsList.call(posts: items, style: 'background-color: red')
-      end
-    end
+    expect(
+      Greeter.call(name: 'James')
+    ).to eq("<h1>Hello, James.</h1>")
   end
 
-  it('works') { expect(docs).to include('<ul style="background-color: red">') }
+  it 'upgrades to a component for more complex logic' do
+    require 'rack/component'
+
+    class FancyGreeter < Rack::Component
+      render do |env|
+        "<h1>Hello, #{title} #{env[:name]}.</h1>"
+      end
+
+      def title
+        env[:title] || "President"
+      end
+    end
+
+    expect(
+      FancyGreeter.call(name: 'Macron')
+    ).to eq("<h1>Hello, President Macron.</h1>")
+    expect(
+      FancyGreeter.call(name: 'Merkel', title: 'Chancellor')
+    ).to eq("<h1>Hello, Chancellor Merkel.</h1>")
+  end
+
+  it 'uses memoized to speed up re-rendering' do
+    module Net
+      module HTTP
+        def self.get(uri); 'President'; end
+      end
+    end
+
+    class NetworkGreeter < Rack::Component
+      render do |env|
+        "<h1>Hello, #{title} #{env[:name]}.</h1>"
+      end
+
+      def title
+        Net::HTTP.get("http://api.heads-of-state.gov/?q=#{env[:name]}")
+      end
+    end
+
+    expect(
+      NetworkGreeter.memoized(name: 'Macron')
+    ).to eq("<h1>Hello, President Macron.</h1>")
+  end
+
+  describe 'Recipes' do
+    it 'renders a list of posts' do
+      class PostsList < Rack::Component
+        render do |env|
+          <<~HTML
+            <h1>This is a list of posts</h1>
+            <ul>
+              #{render_items}
+            </ul>
+          HTML
+        end
+
+        def render_items
+          env[:posts].map { |post|
+            <<~HTML
+              <li class="item">
+                <a href="/posts/#{post[:id]}>
+                  #{post[:name]}
+                </a>
+              </li>
+            HTML
+          }.join
+        end
+      end
+
+      posts = [{ name: 'First Post', id: 1 }, { name: 'Second', id: 2 }]
+      expect(PostsList.call(posts: posts)).to include('First Post')
+    end
+  end
 end
