@@ -94,7 +94,7 @@ RSpec.describe Rack::Component do
     end
   end
 
-  describe 'cached' do
+  describe 'memoized' do
     before do
       @rando = Class.new(Rack::Component) do
         render { |_| SecureRandom.uuid }
@@ -102,8 +102,8 @@ RSpec.describe Rack::Component do
     end
 
     it 'caches identical calls' do
-      @rando.cached.tap do |uuid|
-        expect(@rando.cached).to eq(uuid)
+      @rando.memoized.tap do |uuid|
+        expect(@rando.memoized).to eq(uuid)
       end
     end
 
@@ -117,14 +117,14 @@ RSpec.describe Rack::Component do
         render { |_| SecureRandom.uuid }
       end
 
-      comp.cached(id: 1, name: "chris").tap do |output|
-        expect(comp.cached(id: 1, name: "chris")).to eq(output)
-        expect(comp.cached(id: 2, name: "chris")).not_to eq(output)
+      comp.memoized(id: 1, name: "chris").tap do |output|
+        expect(comp.memoized(id: 1, name: "chris")).to eq(output)
+        expect(comp.memoized(id: 2, name: "chris")).not_to eq(output)
       end
     end
 
     it 'limits the cache size to 100 keys by default' do
-      (0..200).map { |key| @rando.cached(key) }
+      (0..200).map { |key| @rando.memoized(key) }
       @rando.send(:cache).store.tap do |store|
         expect(store.length).to eq(100)
       end
@@ -135,33 +135,28 @@ RSpec.describe Rack::Component do
         cache { MemoryCache.new(length: 50) }
         render { |_| "meh" }
       end
-      (0..200).map { |key| Tiny.cached(key) }
+      (0..200).map { |key| Tiny.memoized(key) }
       Tiny.send(:cache).store.tap do |store|
         expect(store.length).to eq(50)
       end
     end
 
     it 'busts cache based on props' do
-      @rando.cached.tap do |uuid|
-        expect(@rando.cached(1)).not_to eq(uuid)
+      @rando.memoized.tap do |uuid|
+        expect(@rando.memoized(1)).not_to eq(uuid)
       end
     end
 
     it 'does not bust cache based on block' do
-      @rando.cached.tap do |uuid|
-        expect(@rando.cached { 'children' }).to eq(uuid)
+      @rando.memoized.tap do |uuid|
+        expect(@rando.memoized { 'children' }).to eq(uuid)
       end
     end
 
     it 'flushes itself on #flush' do
-      @rando.cached
+      @rando.memoized
       @rando.flush
       expect(@rando.send(:cache).store.empty?).to eq(true)
-    end
-
-    it 'warms itself on #warm' do
-      @rando.warm(*%w[this that another])
-      expect(@rando.send(:cache).store.length).to eq(3)
     end
   end
 end
