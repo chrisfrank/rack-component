@@ -3,49 +3,50 @@
 Like a React.js component, a `Rack::Component` implements a `render` method that
 takes input data and returns what to display.
 
-## In your Gemfile:
 ```ruby
-gem 'rack-component', require: 'rack/component'
+bundle add 'rack-component'
 ```
 
-## Getting Started
+## Get Started
 
 The simplest component is just a function:
+
 ```ruby
 Greeter = lambda do |env|
-  "<h1>Hello, #{env[:name]}.</h1>"
+  "<h1>Hi, #{env[:name]}.</h1>"
 end
 
-Greeter.call(name: 'Mina') #=> '<h1>Hello, Mina.</h1>'
+Greeter.call(name: 'Mina') #=> '<h1>Hi, Mina.</h1>'
 ```
 
 Convert your function to a `Rack::Component` when it needs instance methods or state:
+
 ```ruby
 require 'rack/component'
 
 class FormalGreeter < Rack::Component
   render do |env|
-    "<h1>Hello, #{title} #{env[:name]}.</h1>"
+    "<h1>Hi, #{title} #{env[:name]}.</h1>"
   end
 
   def title
-    # the hash you pass to `call` is available as `env` in
-    # your component's instance methods
+    # the hash you pass to `call` is available as `env` in instance methods
     env[:title] || "President"
   end
 end
 
-FancyGreeter.call(name: 'Macron') #=> "<h1>Hello, President Macron.</h1>"
-FancyGreeter.call(name: 'Merkel', title: 'Chancellor') #=> "<h1>Hello, Chancellor Merkel.</h1>"
+FormalGreeter.call(name: 'Macron') #=> "<h1>Hi, President Macron.</h1>"
+FormalGreeter.call(name: 'Merkel', title: 'Chancellor') #=> "<h1>Hi, Chancellor Merkel.</h1>"
 ```
 
 Replace `#call` with `#memoized` to make re-renders instant:
+
 ```ruby
 require 'rack/component'
 require 'net/http'
 class NetworkGreeter < Rack::Component
   render do |env|
-    "Hello, #{get_job_title_from_api} #{env[:name]}."
+    "Hi, #{get_job_title_from_api} #{env[:name]}."
   end
 
   def get_job_title_from_api
@@ -56,17 +57,17 @@ end
 
 NetworkGreeter.memoized(name: 'Macron')
 # ...after a slow network call to our fictional Heads Of State API
-#=> "Hello, President Macron."
+#=> "Hi, President Macron."
 
 NetworkGreeter.memoized(name: 'Macron') # subsequent calls with the same env are instant.
-#=> "Hello, President Macron."
+#=> "Hi, President Macron."
 
 NetworkGreeter.memoized(name: 'Merkel')
 # ...this env is new, so NetworkGreeter makes another network call
-#=> "Hello, Chancellor Merkel."
+#=> "Hi, Chancellor Merkel."
 
-NetworkGreeter.memoized(name: 'Merkel') #=> instant! "Hello, Chancellor Merkel."
-NetworkGreeter.memoized(name: 'Macron') #=> instant! "Hello, President Macron."
+NetworkGreeter.memoized(name: 'Merkel') #=> instant! "Hi, Chancellor Merkel."
+NetworkGreeter.memoized(name: 'Macron') #=> instant! "Hi, President Macron."
 ```
 
 ## Recipes
@@ -74,11 +75,13 @@ NetworkGreeter.memoized(name: 'Macron') #=> instant! "Hello, President Macron."
 ### Render one component inside another
 You can nest Rack::Components as if they were [React Children][JSX Children] by
 calling them with a block.
+
 ```ruby
 Layout.call(title: 'Home') { Content.call }
 ```
 
 Here's a more fully fleshed example:
+
 ```ruby
 require 'rack/component'
 
@@ -91,7 +94,7 @@ end
 class PostPage < Rack::Component
   render do |env|
     post = Post.find(id: env[:id])
-    # Nest a PostView inside a Layout
+    # Nest a PostContent instance inside a Layout instance
     Layout.call(title: post.title) do
       PostContent.call(title: post.title, body: post.body)
     end
@@ -128,7 +131,8 @@ end
 ```
 
 ### Render an HTML list from an array
-[JSX Lists] use JavaScript's `map` function. Rack::Component does likewise.
+[JSX Lists][JSX Lists] use JavaScript's `map` function. Rack::Component does
+likewise.
 
 ```ruby
 require 'rack/component'
@@ -151,7 +155,7 @@ class PostsList < Rack::Component
           </a>
         </li>
       HTML
-    }.join
+    }.join #unlike, with JSX, you need to call `join` on your array
   end
 end
 
@@ -160,6 +164,8 @@ PostsList.call(posts: posts) #=> <h1>This is a list of posts</h1> <ul>...etc
 ```
 
 ### Mount a Rack::Component tree inside a Rails app
+For when just a few parts of your app are built with components:
+
 ```ruby
 # config/routes.rb
 mount MyComponent, at: '/a_path_of_your_choosing'
@@ -173,6 +179,14 @@ class MyComponent < Rack::Component
     HTML
   end
 end
+```
+
+### Build an entire Rack app out of Rack::Components
+In real life, maybe don't do this. Use [Roda] or [Sinatra] for routing, and use
+Rack::Component instead of Controllers, Views, and templates. But to see an
+entire app built only out of Rack::Components, see
+[the example spec](https://github.com/chrisfrank/rack-component/blob/master/spec/raw_rack_example_spec.rb).
+
 
 ## API Reference
 The full API reference is available here:
@@ -210,6 +224,12 @@ access a database, don't do network I/O, and aren't very CPU-intensive, it's
 probably fastest not to memoize. For components that do I/O, using `#memoize`
 can speed things up by several orders of magnitude.
 
+## Compatibility
+Rack::Component has zero dependencies, and will work in any Rack app. It should
+even work *outside* a Rack app, because it's not actually dependent on Rack. I
+packaged it under the Rack namespace because it follows the Rack `call`
+specification, and because that's where I use and test it.
+
 ## Anybody using this in production?
 
 Aye:
@@ -219,8 +239,8 @@ Aye:
 
 ## Ruby reference:
 
-Where React uses [JSX] to make components more ergonomic, Rack::Component
-uses the ergonomics built into Ruby, specifically:
+Where React uses [JSX] to make components more ergonomic, Rack::Component leans
+heavily on some features built into the Ruby language, specifically:
 
 - [Heredocs]
 - [String Interpolation]
@@ -254,3 +274,5 @@ MIT
 [Heredocs]: https://ruby-doc.org/core-2.5.0/doc/syntax/literals_rdoc.html#label-Here+Documents
 [String Interpolation]: http://ruby-for-beginners.rubymonstas.org/bonus/string_interpolation.html
 [Ruby Blocks]: https://mixandgo.com/learn/mastering-ruby-blocks-in-less-than-5-minutes
+[Roda]: http://roda.jeremyevans.net
+[Sinatra]: http://sinatrarb.com

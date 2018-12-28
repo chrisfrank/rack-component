@@ -41,7 +41,6 @@ Gem::Specification.new do |spec|
   spec.add_development_dependency 'reek', '~> 5'
   spec.add_development_dependency 'rspec', '~> 3.0'
   spec.add_development_dependency 'rubocop', '~> 0.59'
-  spec.add_development_dependency 'sinatra', '~> 2'
   spec.add_development_dependency 'tilt', '~> 2'
   spec.add_development_dependency 'yard', '~> 0.9'
 end

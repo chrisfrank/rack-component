@@ -1,10 +1,10 @@
 module Rack
   class Component
-    # Threadsafe in-memory cache
+    # A threadsafe, in-memory, per-component cache
     class MemoryCache
       attr_reader :store, :mutex
 
-      # Store cache in a hash
+      # Use a hash to store cached calls and a mutex to make it threadsafe
       def initialize(length: 100)
         @store = {}
         @length = length
@@ -20,7 +20,7 @@ module Rack
         end
       end
 
-      # empty the cache
+      # Empty the cache
       # @return [Hash] the empty store
       def flush
         mutex.synchronize { @store = {} }
@@ -37,7 +37,5 @@ module Rack
         end
       end
     end
-
-    private_constant :MemoryCache
   end
 end

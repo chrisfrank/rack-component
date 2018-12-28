@@ -74,8 +74,13 @@ module Rack
         define_method :call, &block
       end
 
-      private
-
+      # Find or initialize a cache store for a Component class.
+      # With no configuration, the store is a threadsafe in-memory cache, capped
+      # at 100 keys in length to avoid leaking RAM.
+      # @example Use a larger cache instead
+      #   class BigComponent < Rack::Component
+      #     cache { MemoryCache.new(length: 2000) }
+      #   end
       def cache
         @cache ||= (block_given? ? yield : MemoryCache.new(length: 100))
       end

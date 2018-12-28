@@ -3,12 +3,12 @@ require 'spec_helper'
 RSpec.describe 'Examples from the README' do
   it 'starts with a plain function' do
     Greeter = lambda do |env|
-      "<h1>Hello, #{env[:name]}.</h1>"
+      "<h1>Hi, #{env[:name]}.</h1>"
     end
 
     expect(
       Greeter.call(name: 'James')
-    ).to eq("<h1>Hello, James.</h1>")
+    ).to eq("<h1>Hi, James.</h1>")
   end
 
   it 'upgrades to a component for more complex logic' do
@@ -16,7 +16,7 @@ RSpec.describe 'Examples from the README' do
 
     class FancyGreeter < Rack::Component
       render do |env|
-        "<h1>Hello, #{title} #{env[:name]}.</h1>"
+        "<h1>Hi, #{title} #{env[:name]}.</h1>"
       end
 
       def title
@@ -26,10 +26,10 @@ RSpec.describe 'Examples from the README' do
 
     expect(
       FancyGreeter.call(name: 'Macron')
-    ).to eq("<h1>Hello, President Macron.</h1>")
+    ).to eq("<h1>Hi, President Macron.</h1>")
     expect(
       FancyGreeter.call(name: 'Merkel', title: 'Chancellor')
-    ).to eq("<h1>Hello, Chancellor Merkel.</h1>")
+    ).to eq("<h1>Hi, Chancellor Merkel.</h1>")
   end
 
   it 'uses memoized to speed up re-rendering' do
@@ -41,7 +41,7 @@ RSpec.describe 'Examples from the README' do
 
     class NetworkGreeter < Rack::Component
       render do |env|
-        "<h1>Hello, #{title} #{env[:name]}.</h1>"
+        "<h1>Hi, #{title} #{env[:name]}.</h1>"
       end
 
       def title
@@ -51,7 +51,7 @@ RSpec.describe 'Examples from the README' do
 
     expect(
       NetworkGreeter.memoized(name: 'Macron')
-    ).to eq("<h1>Hello, President Macron.</h1>")
+    ).to eq("<h1>Hi, President Macron.</h1>")
   end
 
   describe 'Recipes' do
