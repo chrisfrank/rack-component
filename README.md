@@ -10,69 +10,75 @@ gem 'rack-component', require: 'rack/component'
 
 ## Getting Started
 
-1. The simplest component is just a function:
-    ```ruby
-    Greeter = lambda do |env|
-      "<h1>Hello, #{env[:name]}.</h1>"
-    end
+The simplest component is just a function:
+```ruby
+Greeter = lambda do |env|
+  "<h1>Hello, #{env[:name]}.</h1>"
+end
 
-    Greeter.call(name: 'James') #=> '<h1>Hello, James.</h1>'
-    ```
-2. Convert your function to a `Rack::Component` to supercharge it:
-    ```ruby
-    require 'rack/component'
-    class FormalGreeter < Rack::Component
-      render do |env|
-        "<h1>Hello, #{title} #{env[:name]}.</h1>"
-      end
+Greeter.call(name: 'Mina') #=> '<h1>Hello, Mina.</h1>'
+```
 
-      def title
-        # the hash you pass to `call` is available as `env` in
-        # your component's instance methods
-        env[:title] || "President"
-      end
-    end
+Convert your function to a `Rack::Component` when it needs instance methods or state:
+```ruby
+require 'rack/component'
 
-    FancyGreeter.call(name: 'Macron') #=> "<h1>Hello, President Macron.</h1>"
-    FancyGreeter.call(name: 'Merkel', title: 'Chancellor) #=> "<h1>Hello, Chancellor Merkel.</h1>"
-    ```
+class FormalGreeter < Rack::Component
+  render do |env|
+    "<h1>Hello, #{title} #{env[:name]}.</h1>"
+  end
 
-3. Replace `#call` with `#memoized` to make re-renders instant:
-    ```ruby
-    require 'rack/component'
-    require 'net/http'
-    class NetworkGreeter < Rack::Component
-      render do |env|
-        "Hello, #{get_job_title_from_api} #{env[:name]}."
-      end
+  def title
+    # the hash you pass to `call` is available as `env` in
+    # your component's instance methods
+    env[:title] || "President"
+  end
+end
 
-      def get_job_title_from_api
-        endpoint = URI("http://api.heads-of-state.gov/")
-        Net::HTTP.get("#{endpoint}?q=#{env[:name]}")
-      end
-    end
+FancyGreeter.call(name: 'Macron') #=> "<h1>Hello, President Macron.</h1>"
+FancyGreeter.call(name: 'Merkel', title: 'Chancellor') #=> "<h1>Hello, Chancellor Merkel.</h1>"
+```
 
-    NetworkGreeter.memoized(name: 'Macron')
-    # ...after a slow network call to our fictional Heads Of State API
-    #=> "Hello, President Macron."
+Replace `#call` with `#memoized` to make re-renders instant:
+```ruby
+require 'rack/component'
+require 'net/http'
+class NetworkGreeter < Rack::Component
+  render do |env|
+    "Hello, #{get_job_title_from_api} #{env[:name]}."
+  end
 
-    NetworkGreeter.memoized(name: 'Macron') # subsequent calls with the same env are instant.
-    #=> "Hello, President Macron."
+  def get_job_title_from_api
+    endpoint = URI("http://api.heads-of-state.gov/")
+    Net::HTTP.get("#{endpoint}?q=#{env[:name]}")
+  end
+end
 
-    NetworkGreeter.memoized(name: 'Merkel')
-    # ...this env is new, so NetworkGreeter makes another network call
-    #=> "Hello, Chancellor Merkel."
+NetworkGreeter.memoized(name: 'Macron')
+# ...after a slow network call to our fictional Heads Of State API
+#=> "Hello, President Macron."
 
-    NetworkGreeter.memoized(name: 'Merkel') #=> instant! "Hello, Chancellor Merkel."
-    NetworkGreeter.memoized(name: 'Macron') #=> instant! "Hello, President Macron."
-    ```
+NetworkGreeter.memoized(name: 'Macron') # subsequent calls with the same env are instant.
+#=> "Hello, President Macron."
+
+NetworkGreeter.memoized(name: 'Merkel')
+# ...this env is new, so NetworkGreeter makes another network call
+#=> "Hello, Chancellor Merkel."
+
+NetworkGreeter.memoized(name: 'Merkel') #=> instant! "Hello, Chancellor Merkel."
+NetworkGreeter.memoized(name: 'Macron') #=> instant! "Hello, President Macron."
+```
 
 ## Recipes
 
-### Render a content Component inside a layout Component:
+### Render one component inside another
 You can nest Rack::Components as if they were [React Children][JSX Children] by
-calling your components with a block:
+calling them with a block.
+```ruby
+Layout.call(title: 'Home') { Content.call }
+```
 
+Here's a more fully fleshed example:
 ```ruby
 require 'rack/component'
 
@@ -85,13 +91,14 @@ end
 class PostPage < Rack::Component
   render do |env|
     post = Post.find(id: env[:id])
+    # Nest a PostView inside a Layout
     Layout.call(title: post.title) do
-      PostView.call(title: post.title, body: post.body)
+      PostContent.call(title: post.title, body: post.body)
     end
   end
 end
 
-class PostView < Rack::Component
+class PostContent < Rack::Component
   render do |env|
     <<~HTML
       <article>
@@ -104,6 +111,7 @@ end
 
 class Layout < Rack::Component
   render do |env, &children|
+    # the `&children` param is just a standard ruby block
     <<~HTML
       <!DOCTYPE html>
       <html>
