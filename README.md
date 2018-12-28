@@ -150,12 +150,12 @@ class PostsList < Rack::Component
     env[:posts].map { |post|
       <<~HTML
         <li class="item">
-          <a href="#{post[:url]}>
+          <a href="#{post[:url]}">
             #{post[:name]}
           </a>
         </li>
       HTML
-    }.join #unlike, with JSX, you need to call `join` on your array
+    }.join #unlike JSX, you need to call `join` on your array
   end
 end
 
