@@ -159,6 +159,21 @@ posts = [{ name: 'First Post', id: 1 }, { name: 'Second', id: 2 }]
 PostsList.call(posts: posts) #=> <h1>This is a list of posts</h1> <ul>...etc
 ```
 
+### Mount a Rack::Component tree inside a Rails app
+```ruby
+# config/routes.rb
+mount MyComponent, at: '/a_path_of_your_choosing'
+
+# config/initializers/my_component.rb
+require 'rack/component'
+class MyComponent < Rack::Component
+  render do |env|
+    <<~HTML
+      <h1>Hello from inside a Rails app!</h1>
+    HTML
+  end
+end
+
 ## API Reference
 The full API reference is available here:
 
