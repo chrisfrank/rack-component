@@ -1,7 +1,8 @@
 # Rack::Component
 
 Like a React.js component, a `Rack::Component` implements a `render` method that
-takes input data and returns what to display.
+takes input data and returns what to display. You can use Components instead of
+Controllers, Views, Templates, Controllers, and Helpers, in any Rack app.
 
 ## Install
 
@@ -9,6 +10,19 @@ Add `rack-component` to your Gemfile and run `bundle install`:
 
 ```
 gem 'rack-component'
+```
+
+## Quickstart with Sinatra
+```ruby
+# config.ru
+require 'sinatra'
+require 'rack/component'
+
+class Hello < Rack::Component
+  render { |env| "<h1>Hello, #{env[:name]}</h1>" }
+end
+
+get('/hello/:name') { Hello.call(name: params[:name]) }
 ```
 
 ## Table of Contents
