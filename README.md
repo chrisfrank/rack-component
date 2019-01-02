@@ -23,6 +23,7 @@ class Hello < Rack::Component
 end
 
 get('/hello/:name') { Hello.call(name: params[:name]) }
+run Sinatra::Application
 ```
 
 ## Table of Contents
