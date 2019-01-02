@@ -19,10 +19,15 @@ require 'sinatra'
 require 'rack/component'
 
 class Hello < Rack::Component
-  render { |env| "<h1>Hello, #{env[:name]}</h1>" }
+  render do |env|
+    "<h1>Hello, #{env[:name]}</h1>"
+  end
 end
 
-get('/hello/:name') { Hello.call(name: params[:name]) }
+get '/hello/:name' do
+  Hello.call(name: params[:name])
+end
+
 run Sinatra::Application
 ```
 
