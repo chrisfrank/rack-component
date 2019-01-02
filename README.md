@@ -3,13 +3,42 @@
 Like a React.js component, a `Rack::Component` implements a `render` method that
 takes input data and returns what to display.
 
-```ruby
-bundle add 'rack-component'
+## Install
+
+Add `rack-component` to your Gemfile and run `bundle install`:
+
+```
+gem 'rack-component'
 ```
 
-## Get Started
+## Table of Contents
 
-The simplest component is just a function with an `env` parameter:
+* [Getting Started](#getting-started)
+  * [Components as plain functions](#components-as-plain-functions)
+  * [Components as Rack::Components](#components-as-rackcomponents)
+  * [Components that re-render instantly](#components-that-re-render-instantly)
+* [Recipes](#recipes)
+  * [Render one component inside another](#render-one-component-inside-another)
+  * [Memoize an expensive component for one minute](#memoize-an-expensive-component-for-one-minute)
+  * [Memoize an expensive component until its content changes](#memoize-an-expensive-component-until-its-content-changes)
+  * [Render an HTML list from an array](#render-an-html-list-from-an-array)
+  * [Render a Rack::Component from a Rails controller](#render-a-rackcomponent-from-a-rails-controller)
+  * [Mount a Rack::Component as a Rack app](#mount-a-rackcomponent-as-a-rack-app)
+  * [Build an entire App out of Rack::Components](#build-an-entire-app-out-of-rackcomponents)
+* [API Reference](#api-reference)
+* [Performance](#performance)
+* [Compatibility](#compatibility)
+* [Anybody using this in production?](#anybody-using-this-in-production)
+* [Ruby reference:](#ruby-reference)
+* [Development](#development)
+* [Contributing](#contributing)
+* [License](#license)
+
+## Getting Started
+
+### Components as plain functions
+
+The simplest component is just a lambda that takes an `env` parameter:
 
 ```ruby
 Greeter = lambda do |env|
@@ -19,12 +48,13 @@ end
 Greeter.call(name: 'Mina') #=> '<h1>Hi, Mina.</h1>'
 ```
 
-Convert your function to a `Rack::Component` when it needs instance methods or
+### Components as Rack::Components
+
+Convert your lambda to a `Rack::Component` when it needs instance methods or
 state:
 
 ```ruby
 require 'rack/component'
-
 class FormalGreeter < Rack::Component
   render do |env|
     "<h1>Hi, #{title} #{env[:name]}.</h1>"
@@ -39,6 +69,8 @@ end
 FormalGreeter.call(name: 'Macron') #=> "<h1>Hi, President Macron.</h1>"
 FormalGreeter.call(name: 'Merkel', title: 'Chancellor') #=> "<h1>Hi, Chancellor Merkel.</h1>"
 ```
+
+### Components that re-render instantly
 
 Replace `#call` with `#memoized` to make re-renders with the same `env` instant:
 
@@ -74,7 +106,8 @@ NetworkGreeter.memoized(name: 'Macron') #=> instant! "Hi, President Macron."
 ## Recipes
 
 ### Render one component inside another
-You can nest Rack::Components as if they were [React Children][JSX Children] by
+
+You can nest Rack::Components as if they were [React Children][jsx children] by
 calling them with a block.
 
 ```ruby
@@ -95,9 +128,16 @@ end
 class PostPage < Rack::Component
   render do |env|
     post = Post.find(id: env[:id])
-    # Nest a PostContent instance inside a Layout instance
+    # Nest a PostContent instance inside a Layout instance, with some arbitrary HTML too
     Layout.call(title: post.title) do
-      PostContent.call(title: post.title, body: post.body)
+      <<~HTML
+        <main>
+          #{PostContent.call(title: post.title, body: post.body)}
+          <footer>
+            I am a footer.
+          </footer>
+        </main>
+      HTML
     end
   end
 end
@@ -131,8 +171,54 @@ class Layout < Rack::Component
 end
 ```
 
+### Memoize an expensive component for one minute
+
+You can use `memoized` as a time-based cache by passing a timestamp to `env`:
+
+```ruby
+require 'rack/component'
+
+# Render one million posts as JSON
+class MillionPosts < Rack::Component
+  render { |env| Post.limit(1_000_000).to_json }
+end
+
+MillionPosts.memoized(Time.now.to_i / 60) #=> first call is slow
+MillionPosts.memoized(Time.now.to_i / 60) #=> next calls in same minute are quick
+```
+
+### Memoize an expensive component until its content changes
+
+This recipe will speed things up when your database calls are fast but your
+render method is slow:
+
+```ruby
+require 'rack/component'
+class PostAnalysis < Rack::Component
+  render do |env|
+    <<~HTML
+      <h1>#{env[:post].title}</h1>
+      <article>#{env[:post].content}</article>
+      <aside>#{expensive_natural_language_analysis}</aside>
+    HTML
+  end
+
+  def expensive_natural_language_analysis
+    FancyNaturalLanguageLibrary.analyze(env[:post].content)
+  end
+end
+
+PostAnalysis.memoized(post: Post.find(1)) #=> slow, because it runs an expensive natural language analysis
+PostAnalysis.memoized(post: Post.find(1)) #=> instant, because the content of :post has not changed
+```
+
+This recipe works with any Ruby object that implements a `#hash` method based
+on the object's content, including instances of `ActiveRecord::Base` and
+`Sequel::Model`.
+
 ### Render an HTML list from an array
-[JSX Lists][JSX Lists] use JavaScript's `map` function. Rack::Component does
+
+[JSX Lists][jsx lists] use JavaScript's `map` function. Rack::Component does
 likewise, only you need to call `join` on the array:
 
 ```ruby
@@ -165,6 +251,7 @@ PostsList.call(posts: posts) #=> <h1>This is a list of posts</h1> <ul>...etc
 ```
 
 ### Render a Rack::Component from a Rails controller
+
 ```ruby
 # app/controllers/posts_controller.rb
 class PostsController < ApplicationController
@@ -184,6 +271,7 @@ end
 ```
 
 ### Mount a Rack::Component as a Rack app
+
 Because Rack::Components follow the same API as a Rack app, you can mount them
 anywhere you can mount a Rack app. It's up to you to return a valid rack
 tuple, though.
@@ -213,14 +301,15 @@ end
 run Posts
 ```
 
-### Build an entire Rack app out of Rack::Components
+### Build an entire App out of Rack::Components
+
 In real life, maybe don't do this. Use [Roda] or [Sinatra] for routing, and use
 Rack::Component instead of Controllers, Views, and templates. But to see an
 entire app built only out of Rack::Components, see
 [the example spec](https://github.com/chrisfrank/rack-component/blob/master/spec/raw_rack_example_spec.rb).
 
-
 ## API Reference
+
 The full API reference is available here:
 
 https://www.rubydoc.info/gems/rack-component
@@ -229,6 +318,7 @@ For info on how to clear or change the size of the memoziation cache, please see
 [the spec][spec].
 
 ## Performance
+
 On my machine, Rendering a Rack::Component is almost 10x faster than rendering a
 comparable Tilt template, and almost 100x faster than ERB from the Ruby standard
 library. Run `ruby spec/benchmarks.rb` to see what to expect in your env.
@@ -249,7 +339,7 @@ Calculating -------------------------------------
 Component [memoized]      1.276M (± 0.9%) i/s -      6.432M in   5.041348s
 ```
 
-Notice that using `Component#memoized` is *slower* than using `Component#call`
+Notice that using `Component#memoized` is _slower_ than using `Component#call`
 in this benchmark. Because these components do almost nothing, it's more work to
 check the memoziation cache than to just render. For components that don't
 access a database, don't do network I/O, and aren't very CPU-intensive, it's
@@ -257,8 +347,9 @@ probably fastest not to memoize. For components that do I/O, using `#memoize`
 can speed things up by several orders of magnitude.
 
 ## Compatibility
+
 Rack::Component has zero dependencies, and will work in any Rack app. It should
-even work *outside* a Rack app, because it's not actually dependent on Rack. I
+even work _outside_ a Rack app, because it's not actually dependent on Rack. I
 packaged it under the Rack namespace because it follows the Rack `call`
 specification, and because that's where I use and test it.
 
@@ -276,7 +367,7 @@ heavily on some features built into the Ruby language, specifically:
 
 - [Heredocs]
 - [String Interpolation]
-- [Calling methods with a block][Ruby Blocks]
+- [Calling methods with a block][ruby blocks]
 
 ## Development
 
@@ -300,11 +391,11 @@ https://github.com/chrisfrank/rack-component.
 MIT
 
 [spec]: https://github.com/chrisfrank/rack-component/blob/master/spec/rack/component_spec.rb
-[JSX]: https://reactjs.org/docs/introducing-jsx.html
-[JSX Children]: https://reactjs.org/docs/composition-vs-inheritance.html
-[JSX Lists]: https://reactjs.org/docs/lists-and-keys.html
-[Heredocs]: https://ruby-doc.org/core-2.5.0/doc/syntax/literals_rdoc.html#label-Here+Documents
-[String Interpolation]: http://ruby-for-beginners.rubymonstas.org/bonus/string_interpolation.html
-[Ruby Blocks]: https://mixandgo.com/learn/mastering-ruby-blocks-in-less-than-5-minutes
-[Roda]: http://roda.jeremyevans.net
-[Sinatra]: http://sinatrarb.com
+[jsx]: https://reactjs.org/docs/introducing-jsx.html
+[jsx children]: https://reactjs.org/docs/composition-vs-inheritance.html
+[jsx lists]: https://reactjs.org/docs/lists-and-keys.html
+[heredocs]: https://ruby-doc.org/core-2.5.0/doc/syntax/literals_rdoc.html#label-Here+Documents
+[string interpolation]: http://ruby-for-beginners.rubymonstas.org/bonus/string_interpolation.html
+[ruby blocks]: https://mixandgo.com/learn/mastering-ruby-blocks-in-less-than-5-minutes
+[roda]: http://roda.jeremyevans.net
+[sinatra]: http://sinatrarb.com
