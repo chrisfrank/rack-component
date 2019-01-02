@@ -29,7 +29,7 @@ gem 'rack-component'
 * [Performance](#performance)
 * [Compatibility](#compatibility)
 * [Anybody using this in production?](#anybody-using-this-in-production)
-* [Ruby reference:](#ruby-reference)
+* [Ruby reference](#ruby-reference)
 * [Development](#development)
 * [Contributing](#contributing)
 * [License](#license)
@@ -360,7 +360,7 @@ Aye:
 - [future.com](https://www.future.com/)
 - [Seattle & King County Homelessness Response System](https://hrs.kc.future.com/)
 
-## Ruby reference:
+## Ruby reference
 
 Where React uses [JSX] to make components more ergonomic, Rack::Component leans
 heavily on some features built into the Ruby language, specifically:
