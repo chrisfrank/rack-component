@@ -9,7 +9,7 @@ bundle add 'rack-component'
 
 ## Get Started
 
-The simplest component is just a function:
+The simplest component is just a function with an `env` parameter:
 
 ```ruby
 Greeter = lambda do |env|
@@ -19,7 +19,8 @@ end
 Greeter.call(name: 'Mina') #=> '<h1>Hi, Mina.</h1>'
 ```
 
-Convert your function to a `Rack::Component` when it needs instance methods or state:
+Convert your function to a `Rack::Component` when it needs instance methods or
+state:
 
 ```ruby
 require 'rack/component'
@@ -39,7 +40,7 @@ FormalGreeter.call(name: 'Macron') #=> "<h1>Hi, President Macron.</h1>"
 FormalGreeter.call(name: 'Merkel', title: 'Chancellor') #=> "<h1>Hi, Chancellor Merkel.</h1>"
 ```
 
-Replace `#call` with `#memoized` to make re-renders instant:
+Replace `#call` with `#memoized` to make re-renders with the same `env` instant:
 
 ```ruby
 require 'rack/component'
@@ -132,7 +133,7 @@ end
 
 ### Render an HTML list from an array
 [JSX Lists][JSX Lists] use JavaScript's `map` function. Rack::Component does
-likewise.
+likewise, only you need to call `join` on the array:
 
 ```ruby
 require 'rack/component'
@@ -163,22 +164,53 @@ posts = [{ name: 'First Post', id: 1 }, { name: 'Second', id: 2 }]
 PostsList.call(posts: posts) #=> <h1>This is a list of posts</h1> <ul>...etc
 ```
 
-### Mount a Rack::Component tree inside a Rails app
-For when just a few parts of your app are built with components:
-
+### Render a Rack::Component from a Rails controller
 ```ruby
-# config/routes.rb
-mount MyComponent, at: '/a_path_of_your_choosing'
-
-# config/initializers/my_component.rb
-require 'rack/component'
-class MyComponent < Rack::Component
-  render do |env|
-    <<~HTML
-      <h1>Hello from inside a Rails app!</h1>
-    HTML
+# app/controllers/posts_controller.rb
+class PostsController < ApplicationController
+  def index
+    render json: PostsList.call(params)
   end
 end
+
+# app/components/posts_list.rb
+class PostsList < Rack::Component
+  render { |env| posts.to_json }
+
+  def posts
+    Post.magically_filter_via_params(env)
+  end
+end
+```
+
+### Mount a Rack::Component as a Rack app
+Because Rack::Components follow the same API as a Rack app, you can mount them
+anywhere you can mount a Rack app. It's up to you to return a valid rack
+tuple, though.
+
+```ruby
+# config.ru
+require 'rack/component'
+
+class Posts < Rack::Component
+  render do |env|
+    [status, headers, [body]]
+  end
+
+  def status
+    200
+  end
+
+  def headers
+    { 'Content-Type' => 'application/json' }
+  end
+
+  def body
+    Post.all.to_json
+  end
+end
+
+run Posts
 ```
 
 ### Build an entire Rack app out of Rack::Components
