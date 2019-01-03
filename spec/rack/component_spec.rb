@@ -63,7 +63,7 @@ RSpec.describe Rack::Component do
     it 'yields self when called with a block' do
       @comp = Class.new(Rack::Component)
 
-      @comp.call(1) { |env| "Hi from comp #{env}" }.tap do |res|
+      @comp.call({ id: 1}) { |env| "Hi from comp #{env[:id]}" }.tap do |res|
         expect(res).to eq('Hi from comp 1')
       end
     end
@@ -92,6 +92,15 @@ RSpec.describe Rack::Component do
     @comp.call(captain: 'kirk').tap do |res|
       expect(JSON.parse(res).fetch('captain')).to eq('kirk')
     end
+  end
+
+  it 'escapes output by default' do
+    comp = Class.new(Rack::Component) do
+      render { |env| "<h1>#{env[:name]}</h1>" }
+    end
+
+    result = comp.call(name: '<span>jim</span>')
+    expect(result).to eq('<h1>&lt;span&gt;jim&lt;/span&gt;</h1>')
   end
 
   describe 'memoized' do
@@ -124,7 +133,7 @@ RSpec.describe Rack::Component do
     end
 
     it 'limits the cache size to 100 keys by default' do
-      (0..200).map { |key| @rando.memoized(key) }
+      (0..200).map { |key| @rando.memoized(key: key) }
       @rando.send(:cache).store.tap do |store|
         expect(store.length).to eq(100)
       end
@@ -135,7 +144,7 @@ RSpec.describe Rack::Component do
         cache { MemoryCache.new(length: 50) }
         render { |_| "meh" }
       end
-      (0..200).map { |key| Tiny.memoized(key) }
+      (0..200).map { |key| Tiny.memoized(key: key) }
       Tiny.send(:cache).store.tap do |store|
         expect(store.length).to eq(50)
       end
@@ -143,7 +152,7 @@ RSpec.describe Rack::Component do
 
     it 'busts cache based on props' do
       @rando.memoized.tap do |uuid|
-        expect(@rando.memoized(1)).not_to eq(uuid)
+        expect(@rando.memoized(key: 1)).not_to eq(uuid)
       end
     end
 
