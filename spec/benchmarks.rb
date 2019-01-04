@@ -6,7 +6,7 @@ require 'securerandom'
 require 'erb'
 
 Benchmark.ips do |bm|
-  TILT_TEMPLATE = Tilt['erb'].new { '<%= [:key] %><%= yield %>' }
+  TILT_TEMPLATE = Tilt['erb'].new { '<%= [:key] %>' }
   ERB_TEMPLATE = '<%= @model[:key] %>'
   @model = { key: 1 }
 
@@ -14,26 +14,27 @@ Benchmark.ips do |bm|
     env[:key]
   end
 
-  Comp = Class.new(Rack::Component) do
-    render { |env| "<%= env[:key] %>"}
+  SafeComp = Class.new(Rack::Component) do
+    render { |env| "%{env[:key]}" }
   end
 
-  bm.report('Ruby stdlib ERB') do
+  RawComp = Class.new(Rack::Component) do
+    render(:raw) { |env| "%{key}" }
+  end
+
+  bm.report('Ruby ERB') do
     ERB.new(ERB_TEMPLATE).result(binding)
   end
 
-  bm.report('Tilt (cached)') do
-    TILT_TEMPLATE.render(@model) { 'jim' }
+  bm.report('Tilt') do
+    TILT_TEMPLATE.render(@model)
   end
 
-  bm.report('Lambda') do
-    Fn.call @model
-  end
-  bm.report('Component') do
-    Comp.call @model
+  bm.report('Component [safe]') do
+    SafeComp.call @model
   end
 
-  bm.report('Component [memoized]') do
-    Comp.memoized @model
+  bm.report('Component [raw]') do
+    RawComp.call @model
   end
 end

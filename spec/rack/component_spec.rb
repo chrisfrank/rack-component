@@ -15,7 +15,7 @@ RSpec.describe Rack::Component do
     render do |env, &child|
       local = 'Hello'
       <<~HTML
-        <h1>#{local} %{name}</h1>
+        <h1>#{local} %{env[:name]}</h1>
         #{child&.call}
       HTML
     end

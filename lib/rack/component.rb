@@ -1,5 +1,6 @@
 require_relative 'component/version'
 require_relative 'component/memory_cache'
+require 'cgi'
 
 module Rack
   # Subclass Rack::Component to compose functional, declarative responses to
@@ -71,7 +72,14 @@ module Rack
       #   Greeter.call(name: 'Jim') #=> 'Hi, Jim'
       #   Greeter.call(name: 'Bones') #=> 'Hi, Bones'
       def render(mode = :safe, &block)
-        define_method(:call, &block)
+        define_method :unsafe_call, &block
+        if mode == :safe
+          define_method :call do |&child|
+            format(unsafe_call(env, &child), safe_env)
+          end
+        else
+          define_method(:call) { |&child| unsafe_call(env, &child) }
+        end
       end
 
       # Find or initialize a cache store for a Component class.
@@ -89,6 +97,8 @@ module Rack
     def initialize(env = {})
       @env = env
     end
+
+    attr_reader :env
 
     # Out of the box, a +Rack::Component+ just returns whatever +env+ you call
     # it with, or yields with +env+ if you call it with a block.
@@ -116,6 +126,17 @@ module Rack
       block_given? ? yield(env) : env
     end
 
-    attr_reader :env
+    # @return [String] the param as a string, with HTML characters escaped
+    def h(obj)
+      CGI.escapeHTML(obj.to_s)
+    end
+
+    private
+
+    def safe_env
+      Hash.new do |_hash, key|
+        h(instance_eval(key.to_s))
+      end
+    end
   end
 end

@@ -6,7 +6,7 @@ RSpec.describe 'An app composed of Rack::Components' do
     Class.new(Rack::Component) do
       # Fetch posts, render a layout, then render a post inside the layout,
       # dynamically passing the result of PostFetcher to PostView
-      render do |env|
+      render :raw do |env|
         catch(:halt) { [200, {}, [body]] }
       end
 
@@ -73,8 +73,8 @@ module Components
     render do |env, &children|
       <<~HTML
         <article>
-          <h1>#{env[:title]}</h1>
-          <p>#{env[:body]}</h1>
+          <h1>%{env[:title]}</h1>
+          <p>%{env[:body]}</h1>
           <footer>
             #{children&.call}
           </footer>
@@ -89,7 +89,7 @@ module Components
         <!DOCTYPE html>
         <html>
           <head>
-            <title>#{env[:title]}</title>
+            <title>%{env[:title]}</title>
           </head>
           <body>
             #{children.call}
