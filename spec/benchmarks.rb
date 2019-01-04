@@ -1,8 +1,8 @@
 require_relative 'spec_helper'
 require 'rack/component'
 require 'benchmark/ips'
+require 'erubi'
 require 'tilt'
-require 'securerandom'
 require 'erb'
 
 Benchmark.ips do |bm|
@@ -19,7 +19,7 @@ Benchmark.ips do |bm|
   end
 
   RawComp = Class.new(Rack::Component) do
-    render(:raw) { |env| "%{key}" }
+    render(:raw) { |env| "#{env[:key]}" }
   end
 
   bm.report('Ruby ERB') do

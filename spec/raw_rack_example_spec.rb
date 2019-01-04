@@ -6,12 +6,12 @@ RSpec.describe 'An app composed of Rack::Components' do
     Class.new(Rack::Component) do
       # Fetch posts, render a layout, then render a post inside the layout,
       # dynamically passing the result of PostFetcher to PostView
-      render :raw do |env|
-        catch(:halt) { [200, {}, [body]] }
+      render do |env|
+        [200, {}, [body]]
       end
 
       def body
-        Components::Post.call(id: post_id)
+        post_id ? Components::Post.call(id: post_id) : Components::List.call
       end
 
       def post_id
@@ -21,17 +21,17 @@ RSpec.describe 'An app composed of Rack::Components' do
   end
 
   describe 'with a valid id param' do
+    let(:res) { get('/posts?id=1') }
     it 'renders a post' do
-      get('/posts?id=1') do |res|
-        expect(res.body).to include('Example Title')
-        expect(res.body).to include('DOCTYPE')
-      end
+      expect(res.body).to include('Example Title')
+      expect(res.body).to include('DOCTYPE')
     end
   end
 
   describe 'without an id' do
-    it 'renders 404' do
-      get('/posts') { |res| expect(res.status).to eq(404) }
+    let(:res) { get('/posts') }
+    it 'lists posts' do
+      expect(res.body).to include('<ul>')
     end
   end
 end
@@ -49,11 +49,7 @@ module Components
     end
 
     def record
-      @record ||= PostFetcher.call(id: env[:id].to_i) || halt
-    end
-
-    def halt
-      throw :halt, [404, {}, []]
+      PostFetcher.call(id: env[:id].to_i)
     end
   end
 

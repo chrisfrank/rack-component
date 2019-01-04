@@ -1,5 +1,5 @@
 require_relative 'component/version'
-require_relative 'component/memory_cache'
+require_relative 'component/renderer'
 require 'cgi'
 
 module Rack
@@ -15,7 +15,7 @@ module Rack
       #         <!DOCTYPE html>
       #         <html>
       #           <head>
-      #             <title>#{env[:title]}</title>
+      #             <title>%{env[:title]}</title>
       #           </head>
       #           <body>#{child.call}</body>
       #         </html>
@@ -35,32 +35,6 @@ module Rack
         new(env).call(&child)
       end
 
-      # Use +memoized+ instead of +call+ to memoize the result of +call(env)+
-      # and return it. Subsequent uses of +memoized(env)+ with the same +env+
-      # will be read from a threadsafe in-memory cache, not computed.
-      # @example Cache a slow network call
-      #   class Fetcher < Rack::Component
-      #     render do |env|
-      #       Net::HTTP.get(env[:uri]).to_json
-      #     end
-      #   end
-      #
-      #   Fetcher.memoized(uri: '/slow/api.json')
-      #   # ...
-      #   # many seconds later...
-      #   # => { some: "data" }
-      #
-      #   Fetcher.memoized(uri: '/slow/api.json') #=> instant! { some: "data" }
-      #   Fetcher.memoized(uri: '/other/source.json') #=> slow again!
-      def memoized(env = {}, &child)
-        cache.fetch(env.hash) { call(env, &child) }
-      end
-
-      # Forget all memoized calls to this component.
-      def flush
-        cache.flush
-      end
-
       # Use a +render+ block define what a component will do when you +call+ it.
       # @example Say hello
       #   class Greeter < Rack::Component
@@ -71,26 +45,13 @@ module Rack
       #
       #   Greeter.call(name: 'Jim') #=> 'Hi, Jim'
       #   Greeter.call(name: 'Bones') #=> 'Hi, Bones'
-      def render(mode = :safe, &block)
-        define_method :unsafe_call, &block
-        if mode == :safe
-          define_method :call do |&child|
-            format(unsafe_call(env, &child), safe_env)
-          end
-        else
-          define_method(:call) { |&child| unsafe_call(env, &child) }
+      def render(format = :escaped, &block)
+        renderer = Renderer.new(format)
+        define_method :_raw, &block
+        private :_raw
+        define_method :call do |&child|
+          renderer.call(self, _raw(env, &child))
         end
-      end
-
-      # Find or initialize a cache store for a Component class.
-      # With no configuration, the store is a threadsafe in-memory cache, capped
-      # at 100 keys in length to avoid leaking RAM.
-      # @example Use a larger cache instead
-      #   class BigComponent < Rack::Component
-      #     cache { MemoryCache.new(length: 2000) }
-      #   end
-      def cache
-        @cache ||= (block_given? ? yield : MemoryCache.new(length: 100))
       end
     end
 
@@ -110,7 +71,7 @@ module Rack
     #   Useless = Class.new(Rack::Component)
     #   Useless.call(number: 1) #=> { number: 1 }
     #   Useless.call(number: 2) #=> { number: 2 }
-    #   Useless.call(number: 2) { |env| "the number was #{env[:number]" }
+    #   Useless.call(number: 2) { |env| "the number was %{env[:number]}" }
     #   #=> 'the number was 2'
     #
     # @example a useful component
@@ -129,14 +90,6 @@ module Rack
     # @return [String] the param as a string, with HTML characters escaped
     def h(obj)
       CGI.escapeHTML(obj.to_s)
-    end
-
-    private
-
-    def safe_env
-      Hash.new do |_hash, key|
-        h(instance_eval(key.to_s))
-      end
     end
   end
 end

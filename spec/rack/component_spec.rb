@@ -1,6 +1,5 @@
 require 'spec_helper'
 require 'pry'
-require 'securerandom'
 
 RSpec.describe Rack::Component do
   Fn = proc do |env, &child|
@@ -57,7 +56,7 @@ RSpec.describe Rack::Component do
 
     it 'can set optional keywords with instance methods' do
       comp = Class.new(Rack::Component) do
-        render { |name:, dept: department| "#{name} - #{dept}" }
+        render { |name:, dept: department| "%{name} - %{dept}" }
         def department
           'Staff'
         end
@@ -82,14 +81,14 @@ RSpec.describe Rack::Component do
 
   it 'still works after overriding initialize' do
     comp = Class.new(Rack::Component) do
-      def initialize(id)
+      def initialize(id:)
+        super
         @id = id
       end
     end
-    instance = comp.new(1)
-    expect(instance.instance_variable_get(:@env)).to be(nil)
+    instance = comp.new(id: 1)
     expect(instance.instance_variable_get(:@id)).to be(1)
-    expect(instance.call(2)).to eq(2)
+    expect(comp.call(id: 2)).to eq({ id: 2 })
   end
 
   it 'renders json swimmingly' do
@@ -100,79 +99,6 @@ RSpec.describe Rack::Component do
 
     @comp.call(captain: 'kirk').tap do |res|
       expect(JSON.parse(res).fetch('captain')).to eq('kirk')
-    end
-  end
-
-  it 'escapes output by default' do
-    comp = Class.new(Rack::Component) do
-      render { |env| "<h1><%= env[:name] %></h1>" }
-    end
-
-  end
-
-  describe 'memoized' do
-    before do
-      @rando = Class.new(Rack::Component) do
-        render { |_| SecureRandom.uuid }
-      end
-    end
-
-    it 'caches identical calls' do
-      @rando.memoized.tap do |uuid|
-        expect(@rando.memoized).to eq(uuid)
-      end
-    end
-
-    it 'works with components that have overriden initialize' do
-      comp = Class.new(Rack::Component) do
-        def initialize(id:, name:)
-          @id = id
-          @name = name
-        end
-
-        render { |_| SecureRandom.uuid }
-      end
-
-      comp.memoized(id: 1, name: "chris").tap do |output|
-        expect(comp.memoized(id: 1, name: "chris")).to eq(output)
-        expect(comp.memoized(id: 2, name: "chris")).not_to eq(output)
-      end
-    end
-
-    it 'limits the cache size to 100 keys by default' do
-      (0..200).map { |key| @rando.memoized(key: key) }
-      @rando.send(:cache).store.tap do |store|
-        expect(store.length).to eq(100)
-      end
-    end
-
-    it 'overrides the cache size by calling class#cache with a block' do
-      class Tiny < Rack::Component
-        cache { MemoryCache.new(length: 50) }
-        render { |_| "meh" }
-      end
-      (0..200).map { |key| Tiny.memoized(key: key) }
-      Tiny.send(:cache).store.tap do |store|
-        expect(store.length).to eq(50)
-      end
-    end
-
-    it 'busts cache based on props' do
-      @rando.memoized.tap do |uuid|
-        expect(@rando.memoized(key: 1)).not_to eq(uuid)
-      end
-    end
-
-    it 'does not bust cache based on block' do
-      @rando.memoized.tap do |uuid|
-        expect(@rando.memoized { 'children' }).to eq(uuid)
-      end
-    end
-
-    it 'flushes itself on #flush' do
-      @rando.memoized
-      @rando.flush
-      expect(@rando.send(:cache).store.empty?).to eq(true)
     end
   end
 end
