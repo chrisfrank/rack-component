@@ -15,7 +15,7 @@ Benchmark.ips do |bm|
   end
 
   Comp = Class.new(Rack::Component) do
-    render { |env| env[:key] }
+    render { |env| "<%= env[:key] %>"}
   end
 
   bm.report('Ruby stdlib ERB') do

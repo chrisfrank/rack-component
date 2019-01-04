@@ -3,18 +3,20 @@ require 'pry'
 require 'securerandom'
 
 RSpec.describe Rack::Component do
-  Fn = proc do |env, &children|
+  Fn = proc do |env, &child|
+    local = 'Hello'
     <<~HTML
-      <h1>Hello #{env[:name]}</h1>
-      #{children&.call}
+      <h1>#{local} #{env[:name]}</h1>
+      #{child&.call}
     HTML
   end
 
-  Comp = Class.new(Rack::Component) do
-    render do |env, &children|
+  class Comp < Rack::Component
+    render do |env, &child|
+      local = 'Hello'
       <<~HTML
-        <h1>Hello #{env[:name]}</h1>
-        #{children&.call}
+        <h1>#{local} %{name}</h1>
+        #{child&.call}
       HTML
     end
   end
@@ -28,6 +30,15 @@ RSpec.describe Rack::Component do
     it 'behaves identically with children' do
       props = { name: 'Chris' }
       expect(Comp.call(props) { 'child' }).to eq(Fn.call(props) { 'child' })
+    end
+
+    describe 'with HTML in env' do
+      it 'escapes output by default' do
+        props = { name: '<span>jim</span>' }
+        result = Comp.call(props)
+        expect(result).not_to eq(Fn.call(props))
+        expect(result).to eq("<h1>Hello &lt;span&gt;jim&lt;/span&gt;</h1>\n\n")
+      end
     end
   end
 
@@ -74,8 +85,6 @@ RSpec.describe Rack::Component do
       def initialize(id)
         @id = id
       end
-
-      render { |env| env }
     end
     instance = comp.new(1)
     expect(instance.instance_variable_get(:@env)).to be(nil)
@@ -96,11 +105,9 @@ RSpec.describe Rack::Component do
 
   it 'escapes output by default' do
     comp = Class.new(Rack::Component) do
-      render { |env| "<h1>#{env[:name]}</h1>" }
+      render { |env| "<h1><%= env[:name] %></h1>" }
     end
 
-    result = comp.call(name: '<span>jim</span>')
-    expect(result).to eq('<h1>&lt;span&gt;jim&lt;/span&gt;</h1>')
   end
 
   describe 'memoized' do

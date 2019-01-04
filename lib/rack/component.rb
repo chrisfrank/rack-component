@@ -1,6 +1,5 @@
 require_relative 'component/version'
 require_relative 'component/memory_cache'
-require 'erb'
 
 module Rack
   # Subclass Rack::Component to compose functional, declarative responses to
@@ -32,7 +31,7 @@ module Rack
       #   #   <body><h1>Hello from Rack::Component</h1></body>
       #   # </html>
       def call(env = {}, &child)
-        new(env).call(env, &child)
+        new(env).call(&child)
       end
 
       # Use +memoized+ instead of +call+ to memoize the result of +call(env)+
@@ -71,8 +70,8 @@ module Rack
       #
       #   Greeter.call(name: 'Jim') #=> 'Hi, Jim'
       #   Greeter.call(name: 'Bones') #=> 'Hi, Bones'
-      def render(&block)
-        define_method :call, &block
+      def render(mode = :safe, &block)
+        define_method(:call, &block)
       end
 
       # Find or initialize a cache store for a Component class.
