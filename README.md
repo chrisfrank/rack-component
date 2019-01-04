@@ -2,7 +2,7 @@
 
 Like a React.js component, a `Rack::Component` implements a `render` method that
 takes input data and returns what to display. You can use Components instead of
-Controllers, Views, Templates, Controllers, and Helpers, in any Rack app.
+Controllers, Views, Templates, and Helpers, in any Rack app.
 
 ## Install
 
