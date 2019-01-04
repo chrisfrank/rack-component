@@ -1,5 +1,6 @@
 require_relative 'component/version'
 require_relative 'component/memory_cache'
+require 'cgi'
 
 module Rack
   # Subclass Rack::Component to compose functional, declarative responses to
@@ -117,5 +118,14 @@ module Rack
     end
 
     attr_reader :env
+
+    # @example Strip HTML entities from a string
+    #   class SafeComponent < Rack::Component
+    #     render { |env| h(env[:name]) }
+    #   end
+    #   SafeComponent.call(name: '<h1>hi</h1>') #=> &lt;h1&gt;hi&lt;/h1&gt;
+    def h(obj)
+      CGI.escapeHTML(obj.to_s)
+    end
   end
 end

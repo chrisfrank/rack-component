@@ -6,6 +6,10 @@ detectors:
   NestedIterators:
     ignore_iterators:
       - each_object
+  UtilityFunction:
+    enabled: false
+  UncommunicativeMethodName:
+    enabled: false
 exclude_paths:
   - bin
   - client

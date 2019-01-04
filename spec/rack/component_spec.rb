@@ -31,6 +31,12 @@ RSpec.describe Rack::Component do
     end
   end
 
+  it 'can escape HTML via #h' do
+    comp = Class.new(Rack::Component) { render { |env| h env[:name] } }
+    result = comp.call(name: '<h1>hi</h1>')
+    expect(result).to eq('&lt;h1&gt;hi&lt;/h1&gt;')
+  end
+
   describe 'handling keyword arguments' do
     it 'supports required args' do
       comp = Class.new(Rack::Component) { render { |name:| name } }

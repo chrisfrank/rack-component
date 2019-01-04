@@ -20,7 +20,7 @@ require 'rack/component'
 
 class Hello < Rack::Component
   render do |env|
-    "<h1>Hello, #{env[:name]}</h1>"
+    "<h1>Hello, #{h(env[:name])}</h1>"
   end
 end
 
@@ -30,6 +30,13 @@ end
 
 run Sinatra::Application
 ```
+
+**Note that Rack::Component currently does not escape strings by default**. To
+escape strings, you must use the `#h` helper, as in the example above.
+
+There is an [issue open](https://github.com/chrisfrank/rack-component/issues/4)
+to discuss how to enable escaping by default. If you have ideas or opinions, I'd
+love to hear about them there.
 
 ## Table of Contents
 
