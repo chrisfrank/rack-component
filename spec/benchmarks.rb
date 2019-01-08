@@ -2,21 +2,28 @@ require_relative 'spec_helper'
 require 'rack/component'
 require 'benchmark/ips'
 require 'tilt'
+require 'erubi'
 require 'securerandom'
 require 'erb'
 
 Benchmark.ips do |bm|
   Model = Struct.new(:key)
-  TILT_TEMPLATE = Tilt['erb'].new { '<%= key %>' }
-  ERB_TEMPLATE = '<%= @model.key %>'
-  @model = Model.new(SecureRandom.uuid)
+  ERB_TEMPLATE = '<%= model.key %>'
+  TILT_TEMPLATE = Tilt['erb'].new(escape_html: true) { ERB_TEMPLATE }
+  model = Model.new(SecureRandom.uuid)
 
-  Fn = lambda do |model|
+  Fn = lambda do |model:|
     model.key
   end
 
-  Comp = Class.new(Rack::Component) do
-    render { |env| env.key }
+  MacroComp= Class.new(Rack::Component) do
+    render { "<%= model.key %>" }
+  end
+
+  RawComp= Class.new(Rack::Component) do
+    def render
+      env[:model].key
+    end
   end
 
   bm.report('Ruby stdlib ERB') do
@@ -24,17 +31,18 @@ Benchmark.ips do |bm|
   end
 
   bm.report('Tilt (cached)') do
-    TILT_TEMPLATE.render(@model)
+    TILT_TEMPLATE.render(nil, model: model)
   end
 
   bm.report('Lambda') do
-    Fn.call @model
-  end
-  bm.report('Component') do
-    Comp.call @model
+    Fn.call model: model
   end
 
-  bm.report('Component [memoized]') do
-    Comp.memoized @model
+  bm.report('Component [raw]') do
+    RawComp.call model: model
+  end
+
+  bm.report('Component [macro]') do
+    MacroComp.call model: model
   end
 end

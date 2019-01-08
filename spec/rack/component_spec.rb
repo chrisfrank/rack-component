@@ -11,10 +11,10 @@ RSpec.describe Rack::Component do
   end
 
   Comp = Class.new(Rack::Component) do
-    render do |env, &children|
+    render do
       <<~HTML
         <h1>Hello #{env[:name]}</h1>
-        #{children&.call}
+        #{yield if block_given?}
       HTML
     end
   end

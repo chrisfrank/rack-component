@@ -19,8 +19,8 @@ require 'sinatra'
 require 'rack/component'
 
 class Hello < Rack::Component
-  render do |env|
-    "<h1>Hello, #{h(env[:name])}</h1>"
+  def render
+    "<h1>Hello, #{h env[:name]}</h1>"
   end
 end
 
@@ -31,12 +31,10 @@ end
 run Sinatra::Application
 ```
 
-**Note that Rack::Component currently does not escape strings by default**. To
-escape strings, you must use the `#h` helper, as in the example above.
-
-There is an [issue open](https://github.com/chrisfrank/rack-component/issues/4)
-to discuss how to enable escaping by default. If you have ideas or opinions, I'd
-love to hear about them there.
+**Note that Rack::Component does not escape strings by default**. To escape
+strings, you can either use the `#h` helper like in the example above, or have
+your components render a template that escapes by default. See the
+[recipes][#recipes] section for more.
 
 ## Table of Contents
 
@@ -77,57 +75,26 @@ Greeter.call(name: 'Mina') #=> '<h1>Hi, Mina.</h1>'
 
 ### Components as Rack::Components
 
-Convert your lambda to a `Rack::Component` when it needs instance methods or
-state:
+Upgrade your lambda to a `Rack::Component` when it needs HTML escaping, instance
+methods, or state:
 
 ```ruby
 require 'rack/component'
 class FormalGreeter < Rack::Component
-  render do |env|
-    "<h1>Hi, #{title} #{env[:name]}.</h1>"
-  end
-
   def title
-    # the hash you pass to `call` is available as `env` in instance methods
-    env[:title] || "President"
+    env[:title] || "Queen"
+  end
+
+  def render
+    "<h1>Hi, #{h title} #{h env[:name]}.</h1>"
   end
 end
 
-FormalGreeter.call(name: 'Macron') #=> "<h1>Hi, President Macron.</h1>"
-FormalGreeter.call(name: 'Merkel', title: 'Chancellor') #=> "<h1>Hi, Chancellor Merkel.</h1>"
-```
-
-### Components that re-render instantly
-
-Replace `#call` with `#memoized` to make re-renders with the same `env` instant:
-
-```ruby
-require 'rack/component'
-require 'net/http'
-class NetworkGreeter < Rack::Component
-  render do |env|
-    "Hi, #{get_job_title_from_api} #{env[:name]}."
-  end
-
-  def get_job_title_from_api
-    endpoint = URI("http://api.heads-of-state.gov/")
-    Net::HTTP.get("#{endpoint}?q=#{env[:name]}")
-  end
-end
-
-NetworkGreeter.memoized(name: 'Macron')
-# ...after a slow network call to our fictional Heads Of State API
-#=> "Hi, President Macron."
-
-NetworkGreeter.memoized(name: 'Macron') # subsequent calls with the same env are instant.
-#=> "Hi, President Macron."
-
-NetworkGreeter.memoized(name: 'Merkel')
-# ...this env is new, so NetworkGreeter makes another network call
-#=> "Hi, Chancellor Merkel."
-
-NetworkGreeter.memoized(name: 'Merkel') #=> instant! "Hi, Chancellor Merkel."
-NetworkGreeter.memoized(name: 'Macron') #=> instant! "Hi, President Macron."
+FormalGreeter.call(name: 'Franklin') #=> "<h1>Hi, Queen Franklin.</h1>"
+FormalGreeter.call(
+  title: 'Captain',
+  name: 'Kirk <kirk@starfleet.gov>'
+) #=> <h1>Hi, Captain Kirk &lt;kirk@starfleet.gov&gt;.</h1>
 ```
 
 ## Recipes
@@ -153,13 +120,14 @@ end
 
 # fetch a post from the database and render it inside a layout
 class PostPage < Rack::Component
-  render do |env|
-    post = Post.find(id: env[:id])
-    # Nest a PostContent instance inside a Layout instance, with some arbitrary HTML too
-    Layout.call(title: post.title) do
+  def render
+    @post = Post.find(env[:id])
+    # Nest a PostContent instance inside a Layout instance,
+    # with some arbitrary HTML too
+    Layout.call(title: @post.title) do
       <<~HTML
         <main>
-          #{PostContent.call(title: post.title, body: post.body)}
+          #{PostContent.call(title: @post.title, body: @post.body)}
           <footer>
             I am a footer.
           </footer>
@@ -170,78 +138,32 @@ class PostPage < Rack::Component
 end
 
 class PostContent < Rack::Component
-  render do |env|
+  def render
     <<~HTML
       <article>
-        <h1>#{env[:title]}</h1>
-        #{env[:body]}
+        <h1>#{h env[:title]}</h1>
+        #{h env[:body]}
       </article>
     HTML
   end
 end
 
 class Layout < Rack::Component
-  render do |env, &children|
-    # the `&children` param is just a standard ruby block
+  def render
     <<~HTML
       <!DOCTYPE html>
       <html>
         <head>
-          <title>#{env[:title]}</title>
+          <title>#{h env[:title]}</title>
         </head>
         <body>
-          #{children.call}
+        #{yield}
         </body>
       </html>
     HTML
   end
 end
 ```
-
-### Memoize an expensive component for one minute
-
-You can use `memoized` as a time-based cache by passing a timestamp to `env`:
-
-```ruby
-require 'rack/component'
-
-# Render one million posts as JSON
-class MillionPosts < Rack::Component
-  render { |env| Post.limit(1_000_000).to_json }
-end
-
-MillionPosts.memoized(Time.now.to_i / 60) #=> first call is slow
-MillionPosts.memoized(Time.now.to_i / 60) #=> next calls in same minute are quick
-```
-
-### Memoize an expensive component until its content changes
-
-This recipe will speed things up when your database calls are fast but your
-render method is slow:
-
-```ruby
-require 'rack/component'
-class PostAnalysis < Rack::Component
-  render do |env|
-    <<~HTML
-      <h1>#{env[:post].title}</h1>
-      <article>#{env[:post].content}</article>
-      <aside>#{expensive_natural_language_analysis}</aside>
-    HTML
-  end
-
-  def expensive_natural_language_analysis
-    FancyNaturalLanguageLibrary.analyze(env[:post].content)
-  end
-end
-
-PostAnalysis.memoized(post: Post.find(1)) #=> slow, because it runs an expensive natural language analysis
-PostAnalysis.memoized(post: Post.find(1)) #=> instant, because the content of :post has not changed
-```
-
-This recipe works with any Ruby object that implements a `#hash` method based
-on the object's content, including instances of `ActiveRecord::Base` and
-`Sequel::Model`.
 
 ### Render an HTML list from an array
 
@@ -251,7 +173,7 @@ likewise, only you need to call `join` on the array:
 ```ruby
 require 'rack/component'
 class PostsList < Rack::Component
-  render do |env|
+  def render
     <<~HTML
       <h1>This is a list of posts</h1>
       <ul>
@@ -264,17 +186,51 @@ class PostsList < Rack::Component
     env[:posts].map { |post|
       <<~HTML
         <li class="item">
-          <a href="#{post[:url]}">
+          <a href="/posts/#{post[:id]}>
             #{post[:name]}
           </a>
         </li>
       HTML
-    }.join #unlike JSX, you need to call `join` on your array
+    }.join # unlike JSX, you need to call `join` on your array
   end
 end
 
 posts = [{ name: 'First Post', id: 1 }, { name: 'Second', id: 2 }]
 PostsList.call(posts: posts) #=> <h1>This is a list of posts</h1> <ul>...etc
+```
+
+### Render erb, haml, or other templates via Tilt
+You can use [Tilt][tilt] to make your components render via your preferred
+templating language. You'll need to add `tilt` and a templating library to
+your `Gemfile`. Many templating libraries —notably erubi and haml — support
+escaping output by default via the `escape_html` option:
+
+```ruby
+require 'rack/component'
+require 'tilt'
+require 'erubi'
+
+class ERBComponent < Rack::Component
+  Template = Tilt['erb'].new(escape_html: true) do
+    <<~ERB
+      <h1>Hi, <%= env[:name] %>.</h1>
+    ERB
+  end
+
+  def render
+    Template.render(self)
+  end
+end
+
+ERBComponent.call(
+  name: 'Jim <kirk@starfleet.gov>'
+) #=> "<h1>Hi, Jim &lt;kirk@starfleet.gov&gt;.</h1>"
+```
+
+Rack::Component ships with a `render_template` macro that configures Tilt,
+turns on escaping by default, and defines `#render` for you.
+
+```ruby
 ```
 
 ### Render a Rack::Component from a Rails controller
@@ -289,18 +245,16 @@ end
 
 # app/components/posts_list.rb
 class PostsList < Rack::Component
-  render { |env| posts.to_json }
-
-  def posts
-    Post.magically_filter_via_params(env)
+  def render
+    Post.magically_filter_via_params(env).to_json
   end
 end
 ```
 
 ### Mount a Rack::Component as a Rack app
 
-Because Rack::Components follow the same API as a Rack app, you can mount them
-anywhere you can mount a Rack app. It's up to you to return a valid rack
+Because Rack::Components have the same signature as a Rack app, you can mount
+them anywhere you can mount a Rack app. It's up to you to return a valid rack
 tuple, though.
 
 ```ruby
@@ -308,7 +262,7 @@ tuple, though.
 require 'rack/component'
 
 class Posts < Rack::Component
-  render do |env|
+  def render
     [status, headers, [body]]
   end
 
@@ -426,3 +380,4 @@ MIT
 [ruby blocks]: https://mixandgo.com/learn/mastering-ruby-blocks-in-less-than-5-minutes
 [roda]: http://roda.jeremyevans.net
 [sinatra]: http://sinatrarb.com
+[tilt]: https://github.com/rtomayko/tilt

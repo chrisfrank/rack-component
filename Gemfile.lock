@@ -21,6 +21,10 @@ GEM
       thread_safe (~> 0.3, >= 0.3.1)
     diff-lcs (1.3)
     equalizer (0.0.11)
+    erubi (1.8.0)
+    haml (5.0.4)
+      temple (>= 0.8.0)
+      tilt
     ice_nine (0.11.2)
     jaro_winkler (1.5.1)
     kwalify (0.7.2)
@@ -64,6 +68,7 @@ GEM
       ruby-progressbar (~> 1.7)
       unicode-display_width (~> 1.0, >= 1.0.1)
     ruby-progressbar (1.10.0)
+    temple (0.8.0)
     thread_safe (0.3.6)
     tilt (2.0.8)
     unicode-display_width (1.4.0)
@@ -80,6 +85,8 @@ PLATFORMS
 DEPENDENCIES
   benchmark-ips (~> 2.7)
   bundler (~> 1.16)
+  erubi (~> 1.8)
+  haml (~> 5)
   pry (~> 0.11)
   rack (~> 2.0.6)
   rack-component!
@@ -92,4 +99,4 @@ DEPENDENCIES
   yard (~> 0.9)
 
 BUNDLED WITH
-   1.17.1
+   1.17.2

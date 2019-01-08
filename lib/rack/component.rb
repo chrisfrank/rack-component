@@ -1,5 +1,5 @@
 require_relative 'component/version'
-require_relative 'component/memory_cache'
+require_relative 'component/template'
 require 'cgi'
 
 module Rack
@@ -32,58 +32,14 @@ module Rack
       #   #   <body><h1>Hello from Rack::Component</h1></body>
       #   # </html>
       def call(env = {}, &child)
-        new(env).call env, &child
+        new(env).render(&child)
       end
 
-      # Use +memoized+ instead of +call+ to memoize the result of +call(env)+
-      # and return it. Subsequent uses of +memoized(env)+ with the same +env+
-      # will be read from a threadsafe in-memory cache, not computed.
-      # @example Cache a slow network call
-      #   class Fetcher < Rack::Component
-      #     render do |env|
-      #       Net::HTTP.get(env[:uri]).to_json
-      #     end
-      #   end
-      #
-      #   Fetcher.memoized(uri: '/slow/api.json')
-      #   # ...
-      #   # many seconds later...
-      #   # => { some: "data" }
-      #
-      #   Fetcher.memoized(uri: '/slow/api.json') #=> instant! { some: "data" }
-      #   Fetcher.memoized(uri: '/other/source.json') #=> slow again!
-      def memoized(env = {}, &child)
-        cache.fetch(env.hash) { call(env, &child) }
-      end
-
-      # Forget all memoized calls to this component.
-      def flush
-        cache.flush
-      end
-
-      # Use a +render+ block define what a component will do when you +call+ it.
-      # @example Say hello
-      #   class Greeter < Rack::Component
-      #     render do |env|
-      #       "Hi, #{env[:name]}"
-      #     end
-      #   end
-      #
-      #   Greeter.call(name: 'Jim') #=> 'Hi, Jim'
-      #   Greeter.call(name: 'Bones') #=> 'Hi, Bones'
-      def render(&block)
-        define_method :call, &block
-      end
-
-      # Find or initialize a cache store for a Component class.
-      # With no configuration, the store is a threadsafe in-memory cache, capped
-      # at 100 keys in length to avoid leaking RAM.
-      # @example Use a larger cache instead
-      #   class BigComponent < Rack::Component
-      #     cache { MemoryCache.new(length: 2000) }
-      #   end
-      def cache
-        @cache ||= (block_given? ? yield : MemoryCache.new(length: 100))
+      def render(format = :erb, options = {}, &block)
+        template = Template.new(format, options, &block)
+        define_method :render do |&child|
+          template.render(self, &child)
+        end
       end
     end
 
@@ -93,9 +49,7 @@ module Rack
 
     # Out of the box, a +Rack::Component+ just returns whatever +env+ you call
     # it with, or yields with +env+ if you call it with a block.
-    # Use a class-level +render+ block when wiriting your Components to override
-    # this method with more useful behavior.
-    # @see Rack::Component#render
+    # Override +render+ to make your component do something useful.
     #
     # @example a useless component
     #   Useless = Class.new(Rack::Component)
@@ -104,24 +58,32 @@ module Rack
     #   Useless.call(number: 2) { |env| "the number was #{env[:number]" }
     #   #=> 'the number was 2'
     #
-    # @example a useful component
+    # @example a component that says hello, escaping output via #h
     #   class Greeter < Rack::Component
-    #     render do |env|
-    #       "Hi, #{env[:name]}"
+    #     def render
+    #       "Hi, #{h env[:name]}"
     #     end
     #   end
     #
     #   Greeter.call(name: 'Jim') #=> 'Hi, Jim'
-    #   Greeter.call(name: 'Bones') #=> 'Hi, Bones'
-    def call(*)
+    #   Greeter.call(
+    #     name: 'Bones <mccoy@starfleet.gov>'
+    #   ) #=> 'Hi, Bones &lt;mccoy@starfleet.gov&gt;'
+    def render
       block_given? ? yield(env) : env
     end
 
-    attr_reader :env
+    def to_s
+      render.to_s
+    end
+
+    def env
+      @env || {}
+    end
 
     # @example Strip HTML entities from a string
     #   class SafeComponent < Rack::Component
-    #     render { |env| h(env[:name]) }
+    #     render { h env[:name] }
     #   end
     #   SafeComponent.call(name: '<h1>hi</h1>') #=> &lt;h1&gt;hi&lt;/h1&gt;
     def h(obj)
