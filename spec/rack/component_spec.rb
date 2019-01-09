@@ -3,18 +3,17 @@ require 'pry'
 require 'securerandom'
 
 RSpec.describe Rack::Component do
-  Fn = proc do |env, &children|
+  Fn = proc do |env, &child|
     <<~HTML
       <h1>Hello #{env[:name]}</h1>
-      #{children&.call}
+      #{child&.call}
     HTML
   end
 
   Comp = Class.new(Rack::Component) do
-    render do
+    render do |env, &child|
       <<~HTML
-        <h1>Hello #{env[:name]}</h1>
-        #{yield if block_given?}
+        <h1>Hello <%= env[:name] %></h1>
       HTML
     end
   end

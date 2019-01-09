@@ -13,9 +13,7 @@ RSpec.describe 'Examples from the README' do
     require 'rack/component'
 
     class FormalGreeter < Rack::Component
-      render do
-        "<h1>Hi, <%= title %> <%= name %>.</h1>"
-      end
+      render template: '<h1>Hi, <%= title %> <%= env[:name] %>.</h1>'
 
       def title
         env[:title] || "Queen"
@@ -38,14 +36,14 @@ RSpec.describe 'Examples from the README' do
 
       # fetch a post from the database and render it inside a layout
       class PostPage < Rack::Component
-        def render
-          @post = Post.find(env[:id])
+        render do
+          post = Post.find env[:id]
           # Nest a PostContent instance inside a Layout instance,
           # with some arbitrary HTML too
-          Layout.call(title: @post.title) do
+          Layout.call(title: post.title) do
             <<~HTML
               <main>
-                #{PostContent.call(title: @post.title, body: @post.body)}
+                #{PostContent.call(title: post.title, body: post.body)}
                 <footer>
                   I am a footer.
                 </footer>
@@ -56,30 +54,26 @@ RSpec.describe 'Examples from the README' do
       end
 
       class PostContent < Rack::Component
-        render do
-          <<~ERB
-            <article>
-              <h1><%= title %></h1>
-              <%= body %>
-            </article>
-          ERB
-        end
+        render template: <<~HTML
+          <article>
+            <h1><%= env[:title] %></h1>
+            <%= env[:body] %>
+          </article>
+        HTML
       end
 
       class Layout < Rack::Component
-        def render
-          <<~HTML
-            <!DOCTYPE html>
-            <html>
-              <head>
-                <title>#{h env[:title]}</title>
-              </head>
-              <body>
-              #{yield}
-              </body>
-            </html>
-          HTML
-        end
+        render template: <<~HTML
+          <!DOCTYPE html>
+          <html>
+            <head>
+              <title><%= env[:title] %></title>
+            </head>
+            <body>
+            <%== yield %>
+            </body>
+          </html>
+        HTML
       end
 
       expect(PostPage.call(id: 1)).to include('<h1>Hi</h1>')
@@ -87,7 +81,7 @@ RSpec.describe 'Examples from the README' do
 
     it 'renders a list of posts' do
       class PostsList < Rack::Component
-        def render
+        render do
           <<~HTML
             <h1>This is a list of posts</h1>
             <ul>
@@ -140,11 +134,7 @@ RSpec.describe 'Examples from the README' do
 
       it 'renders ERB via a +render+ macro' do
         class MacroComponent < Rack::Component
-          render do
-            <<~ERB
-              <h1>Hi, <%= name %>.</h1><% binding.pry %>
-            ERB
-          end
+          render template: "<h1>Hi, <%= env[:name] %>.</h1>"
         end
 
         expect(
@@ -152,7 +142,7 @@ RSpec.describe 'Examples from the README' do
             name: 'Jim <kirk@starfleet.gov>',
           )
         ).to eq(
-          "<h1>Hi, Jim &lt;kirk@starfleet.gov&gt;.</h1>\n"
+          "<h1>Hi, Jim &lt;kirk@starfleet.gov&gt;.</h1>"
         )
       end
     end

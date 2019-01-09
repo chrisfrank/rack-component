@@ -1,5 +1,5 @@
 require_relative 'component/version'
-require_relative 'component/template'
+require_relative 'component/renderer'
 require 'cgi'
 
 module Rack
@@ -35,10 +35,15 @@ module Rack
         new(env).render(&child)
       end
 
-      def render(format = :erb, options = {}, &block)
-        template = Template.new(format, options, &block)
-        define_method :render do |&child|
-          template.render(self, &child)
+      def render(options = {})
+        if block_given?
+          define_method(:render, &Proc.new)
+        else
+          engine = options.delete(:engine) || 'erb'
+          renderer = Renderer.new(engine, options)
+          define_method(:render) do |&child|
+            renderer.call(self, &child)
+          end
         end
       end
     end

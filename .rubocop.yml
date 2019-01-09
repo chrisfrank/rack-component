@@ -24,5 +24,3 @@ Style/TrailingCommaInHashLiteral:
   Enabled: false
   StyleGuide: http://relaxed.ruby.style/#styletrailingcommainliteral
   EnforcedStyleForMultiline: consistent_comma
-Style/Documentation:
-  Enabled: false

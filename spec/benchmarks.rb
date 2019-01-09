@@ -17,7 +17,7 @@ Benchmark.ips do |bm|
   end
 
   MacroComp= Class.new(Rack::Component) do
-    render { "<%= model.key %>" }
+    render { "<%= env[:model].key %>" }
   end
 
   RawComp= Class.new(Rack::Component) do
