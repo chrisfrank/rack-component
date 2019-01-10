@@ -13,6 +13,7 @@ gem 'rack-component'
 ```
 
 ## Quickstart with Sinatra
+
 ```ruby
 # config.ru
 require 'sinatra'
@@ -37,6 +38,27 @@ can configure your components to render a template that escapes automatically.
 See the [recipes][#recipes] section for details.
 
 ## Table of Contents
+
+* [Getting Started](#getting-started)
+  * [Components as plain functions](#components-as-plain-functions)
+  * [Components as Rack::Components](#components-as-rackcomponents)
+    * [Components if you hate inheritance](#components-if-you-hate-inheritance)
+* [Recipes](#recipes)
+  * [Render one component inside another](#render-one-component-inside-another)
+  * [Render a template that escapes output by default via Tilt](#render-a-template-that-escapes-output-by-default-via-tilt)
+  * [Render an HTML list from an array](#render-an-html-list-from-an-array)
+  * [Render a Rack::Component from a Rails controller](#render-a-rackcomponent-from-a-rails-controller)
+  * [Mount a Rack::Component as a Rack app](#mount-a-rackcomponent-as-a-rack-app)
+  * [Build an entire App out of Rack::Components](#build-an-entire-app-out-of-rackcomponents)
+  * [Define `#render` at the instance level instead of via `render do`](#define-render-at-the-instance-level-instead-of-via-render-do)
+* [API Reference](#api-reference)
+* [Performance](#performance)
+* [Compatibility](#compatibility)
+* [Anybody using this in production?](#anybody-using-this-in-production)
+* [Ruby reference](#ruby-reference)
+* [Development](#development)
+* [Contributing](#contributing)
+* [License](#license)
 
 ## Getting Started
 
@@ -204,13 +226,12 @@ end
 ```
 
 Template components support using the `yield` keyword to render child
-components, but note the double-equals `<%==` in the example above. If
-your component escapes HTML, and you're yielding to a component that renders
-HTML, you probably want to disable escaping via `==`, just for the
-`<%== yield %>` call. This is safe, as long as the component you're yielding to
-uses escaping.
+components, but note the double-equals `<%==` in the example above. If your
+component escapes HTML, and you're yielding to a component that renders HTML,
+you probably want to disable escaping via `==`, just for the `<%== yield %>`
+call. This is safe, as long as the component you're yielding to uses escaping.
 
-Using `erb` as a key for the inline template is a shorthand, which also works 
+Using `erb` as a key for the inline template is a shorthand, which also works
 with `haml` and `markdown`. But you can also specify `engine` and `template`
 explicitly.
 
@@ -249,7 +270,8 @@ end
 
 ### Render an HTML list from an array
 
-[JSX Lists][jsx lists] use JavaScript's `map` function. Rack::Component does likewise, only you need to call `join` on the array:
+[JSX Lists][jsx lists] use JavaScript's `map` function. Rack::Component does
+likewise, only you need to call `join` on the array:
 
 ```ruby
 require 'rack/component'
@@ -300,9 +322,9 @@ end
 
 ### Mount a Rack::Component as a Rack app
 
-Because Rack::Components have the same signature as Rack app, you can mount
-them anywhere you can mount a Rack app. It's up to you to return a valid rack
-tuple, though.
+Because Rack::Components have the same signature as Rack app, you can mount them
+anywhere you can mount a Rack app. It's up to you to return a valid rack tuple,
+though.
 
 ```ruby
 # config.ru
@@ -335,7 +357,6 @@ In real life, maybe don't do this. Use [Roda] or [Sinatra] for routing, and use
 Rack::Component instead of Controllers, Views, and templates. But to see an
 entire app built only out of Rack::Components, see
 [the example spec](https://github.com/chrisfrank/rack-component/blob/master/spec/raw_rack_example_spec.rb).
-
 
 ### Define `#render` at the instance level instead of via `render do`
 
@@ -379,8 +400,6 @@ On my machine, Rendering a Rack::Component is almost 10x faster than rendering a
 comparable Tilt template, and almost 100x faster than ERB from the Ruby standard
 library. Run `ruby spec/benchmarks.rb` to see what to expect in your env.
 
-Every component in the benchmark is configured to escape HTML when rendering.
-
 ```
 $ ruby spec/benchmarks.rb
 Warming up --------------------------------------
@@ -399,35 +418,43 @@ Calculating -------------------------------------
     RC [render erb:]    165.113k (± 1.7%) i/s -    826.535k in   5.007444s
 ```
 
-Notice that using `Component#memoized` is _slower_ than using `Component#call`
-in this benchmark. Because these components do almost nothing, it's more work to
-check the memoziation cache than to just render. For components that don't
-access a database, don't do network I/O, and aren't very CPU-intensive, it's
-probably fastest not to memoize. For components that do I/O, using `#memoize`
-can speed things up by several orders of magnitude.
+Every component in the benchmark is configured to escape HTML when rendering.
+When rendering via a block, Rack::Component is about 25x faster than ERB and 4x
+faster than Tilt. When rendering a template via Tilt, it (unsurprisingly)
+performs roughly at tilt-speed.
 
 ## Compatibility
 
-Rack::Component has zero dependencies, and will work in any Rack app. It should
-even work _outside_ a Rack app, because it's not actually dependent on Rack. I
-packaged it under the Rack namespace because it follows the Rack `call`
-specification, and because that's where I use and test it.
+When not rendering Tilt templates, Rack::Component has zero dependencies,
+and will work in any Rack app. It should even work _outside_ a Rack app, because
+it's not actually dependent on Rack. I packaged it under the Rack namespace
+because it follows the Rack `call` specification, and because that's where I
+use and test it.
+
+When using Tilt templates, you will need `tilt` and a templating gem in your
+`Gemfile`:
+
+```ruby
+gem 'tilt'
+gem 'erubi' # or gem 'haml', etc
+gem 'rack-component'
+```
 
 ## Anybody using this in production?
 
 Aye:
 
-- [future.com](https://www.future.com/)
-- [Seattle & King County Homelessness Response System](https://hrs.kc.future.com/)
+* [future.com](https://www.future.com/)
+* [Seattle & King County Homelessness Response System](https://hrs.kc.future.com/)
 
 ## Ruby reference
 
 Where React uses [JSX] to make components more ergonomic, Rack::Component leans
 heavily on some features built into the Ruby language, specifically:
 
-- [Heredocs]
-- [String Interpolation]
-- [Calling methods with a block][ruby blocks]
+* [Heredocs]
+* [String Interpolation]
+* [Calling methods with a block][ruby blocks]
 
 ## Development
 
