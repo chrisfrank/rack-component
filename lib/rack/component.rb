@@ -5,94 +5,75 @@ require 'cgi'
 module Rack
   # Subclass Rack::Component to compose functional, declarative responses to
   # HTTP requests.
+  # @example Subclass Rack::Component to compose functional, declarative
+  # responses to HTTP requests.
+  #   class Greeter < Rack::Component
+  #     render { "Hi, #{env[:name]" }
+  #   end
   class Component
-    class << self
-      # Instantiate a new component with given +env+ return its rendered output.
-      # @example Render a child block inside an HTML document
-      #   class Layout < Rack::Component
-      #     render do |env, &child|
-      #       <<~HTML
-      #         <!DOCTYPE html>
-      #         <html>
-      #           <head>
-      #             <title>#{env[:title]}</title>
-      #           </head>
-      #           <body>#{child.call}</body>
-      #         </html>
-      #       HTML
-      #     end
-      #   end
-      #
-      #   Layout.call(title: 'Hello') { "<h1>Hello from Rack::Component" } #=>
-      #   # <!DOCTYPE html>
-      #   # <html>
-      #   #   <head>
-      #   #     <title>Hello</title>
-      #   #   </head>
-      #   #   <body><h1>Hello from Rack::Component</h1></body>
-      #   # </html>
-      def call(env = {}, &child)
-        new(env).render(&child)
+    # @example If you don't want to subclass, you can extend
+    # Rack::Component::Methods instead.
+    #   class POROGreeter
+    #     extend Rack::Component::Methods
+    #     render { "Hi, #{env[:name]" }
+    #   end
+    module Methods
+      def self.extended(base)
+        base.include(InstanceMethods)
+        base.define_method(:initialize) { |env| @env = env }
       end
 
-      def render(options = {})
-        if block_given?
-          define_method(:render, &Proc.new)
-        else
-          engine = options.delete(:engine) || 'erb'
-          renderer = Renderer.new(engine, options)
-          define_method(:render) do |&child|
-            renderer.call(self, &child)
-          end
+      def render(opts = {})
+        block_given? ? configure_block(Proc.new) : configure_template(opts)
+      end
+
+      def call(env = {}, &children)
+        new(env).render(&children)
+      end
+
+      # Instances of Rack::Component come with these methods.
+      module InstanceMethods
+        # +env+ is Rack::Component's version of React's +props+ hash.
+        def env
+          @env || {}
+        end
+
+        # +h+ removes HTML characters from strings via +CGI.escapeHTML+.
+        def h(obj)
+          CGI.escapeHTML(obj.to_s)
         end
       end
+
+      private
+
+      # :reek:TooManyStatements
+      # :reek:DuplicateMethodCall
+      def configure_block(block)
+        # Convert the block to an instance method, because instance_exec
+        # doesn't allow passing an &child param, and because it's faster.
+        define_method :_rc_render, &block
+        private :_rc_render
+
+        # Now that the block is a method, it must be called with the correct
+        # number of arguments. Ruby's +arity+ method is unreliable when keyword
+        # args are involved, so we count arity by hand.
+        arity = block.parameters.reject { |type, _| type == :block }.length
+
+        # Reek hates this DuplicateMethodCall, but fixing it would mean checking
+        # arity at runtime, rather than when the render macro is called.
+        if arity.zero?
+          define_method(:render) { |&child| _rc_render(&child) }
+        else
+          define_method(:render) { |&child| _rc_render(env, &child) }
+        end
+      end
+
+      def configure_template(options)
+        renderer = Renderer.new(options)
+        define_method(:render) { |&child| renderer.call(self, &child) }
+      end
     end
 
-    def initialize(env = {})
-      @env = env
-    end
-
-    # Out of the box, a +Rack::Component+ just returns whatever +env+ you call
-    # it with, or yields with +env+ if you call it with a block.
-    # Override +render+ to make your component do something useful.
-    #
-    # @example a useless component
-    #   Useless = Class.new(Rack::Component)
-    #   Useless.call(number: 1) #=> { number: 1 }
-    #   Useless.call(number: 2) #=> { number: 2 }
-    #   Useless.call(number: 2) { |env| "the number was #{env[:number]" }
-    #   #=> 'the number was 2'
-    #
-    # @example a component that says hello, escaping output via #h
-    #   class Greeter < Rack::Component
-    #     def render
-    #       "Hi, #{h env[:name]}"
-    #     end
-    #   end
-    #
-    #   Greeter.call(name: 'Jim') #=> 'Hi, Jim'
-    #   Greeter.call(
-    #     name: 'Bones <mccoy@starfleet.gov>'
-    #   ) #=> 'Hi, Bones &lt;mccoy@starfleet.gov&gt;'
-    def render
-      block_given? ? yield(env) : env
-    end
-
-    def to_s
-      render.to_s
-    end
-
-    def env
-      @env || {}
-    end
-
-    # @example Strip HTML entities from a string
-    #   class SafeComponent < Rack::Component
-    #     render { h env[:name] }
-    #   end
-    #   SafeComponent.call(name: '<h1>hi</h1>') #=> &lt;h1&gt;hi&lt;/h1&gt;
-    def h(obj)
-      CGI.escapeHTML(obj.to_s)
-    end
+    extend Methods
   end
 end

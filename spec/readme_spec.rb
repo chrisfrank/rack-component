@@ -13,7 +13,7 @@ RSpec.describe 'Examples from the README' do
     require 'rack/component'
 
     class FormalGreeter < Rack::Component
-      render template: '<h1>Hi, <%= title %> <%= env[:name] %>.</h1>'
+      render erb: '<h1>Hi, <%= title %> <%= env[:name] %>.</h1>'
 
       def title
         env[:title] || "Queen"
@@ -34,9 +34,9 @@ RSpec.describe 'Examples from the README' do
         def self.find(*); new('Hi', 'Hello'); end
       end
 
-      # fetch a post from the database and render it inside a layout
+      # Fetch a post from the database and render it inside a Layout
       class PostPage < Rack::Component
-        render do
+        render do |env|
           post = Post.find env[:id]
           # Nest a PostContent instance inside a Layout instance,
           # with some arbitrary HTML too
@@ -53,27 +53,36 @@ RSpec.describe 'Examples from the README' do
         end
       end
 
-      class PostContent < Rack::Component
-        render template: <<~HTML
-          <article>
-            <h1><%= env[:title] %></h1>
-            <%= env[:body] %>
-          </article>
-        HTML
+      class Layout < Rack::Component
+        # Note that render blocks support Ruby's keyword arguments, and, like
+        # any other ruby function, can accept a block.
+        #
+        # Here, :title is a required key in +env+, while &child
+        # is just a regular Ruby block that could be named anything.
+        render do |title:, **, &child|
+          <<~HTML
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <title>
+              </head>
+              <body>
+              #{child.call}
+              </body>
+            </html>
+          HTML
+        end
       end
 
-      class Layout < Rack::Component
-        render template: <<~HTML
-          <!DOCTYPE html>
-          <html>
-            <head>
-              <title><%= env[:title] %></title>
-            </head>
-            <body>
-            <%== yield %>
-            </body>
-          </html>
-        HTML
+      class PostContent < Rack::Component
+        render do |title:, body:, **|
+          <<~HTML
+            <article>
+              <h1>#{h title}</h1>
+              #{h body}
+            </article>
+          HTML
+        end
       end
 
       expect(PostPage.call(id: 1)).to include('<h1>Hi</h1>')
@@ -81,25 +90,23 @@ RSpec.describe 'Examples from the README' do
 
     it 'renders a list of posts' do
       class PostsList < Rack::Component
-        render do
+        render do |posts:, **|
           <<~HTML
             <h1>This is a list of posts</h1>
             <ul>
-              #{render_items}
+              #{posts.map { |post| render_item(post) }.join}
             </ul>
           HTML
         end
 
-        def render_items
-          env[:posts].map { |post|
-            <<~HTML
-              <li class="item">
-                <a href="/posts/#{post[:id]}>
-                  #{post[:name]}
-                </a>
-              </li>
-            HTML
-          }.join # unlike JSX, you need to call `join` on your array
+        def render_item(post)
+          <<~HTML
+            <li class="item">
+              <a href="/posts/#{post[:id]}">
+                #{h post[:name]}
+              </a>
+            </li>
+          HTML
         end
       end
 
@@ -108,33 +115,17 @@ RSpec.describe 'Examples from the README' do
     end
 
     describe 'with tilt' do
-      it 'renders templates via longform config' do
-        require 'rack/component'
-        require 'tilt'
-        require 'erubi'
-
-        class ERBComponent < Rack::Component
-          Template = Tilt['erb'].new(escape_html: true) do
-            <<~ERB
-              <h1>Hi, <%= env[:name] %>.</h1>
-            ERB
-          end
-
-          def render
-            Template.render(self)
-          end
-        end
-
-        expect(
-          ERBComponent.call(name: 'Jim <kirk@starfleet.gov>') { 'hi' }
-        ).to eq(
-          "<h1>Hi, Jim &lt;kirk@starfleet.gov&gt;.</h1>\n"
-        )
-      end
+      require 'rack/component'
+      require 'tilt'
+      require 'erubi'
 
       it 'renders ERB via a +render+ macro' do
         class MacroComponent < Rack::Component
-          render template: "<h1>Hi, <%= env[:name] %>.</h1>"
+          render erb: "<h1>Hi, <%= name %>.</h1>"
+
+          def name
+            env[:name] || 'jim'
+          end
         end
 
         expect(

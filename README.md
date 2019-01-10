@@ -19,7 +19,7 @@ require 'sinatra'
 require 'rack/component'
 
 class Hello < Rack::Component
-  def render
+  render do |env|
     "<h1>Hello, #{h env[:name]}</h1>"
   end
 end
@@ -32,32 +32,11 @@ run Sinatra::Application
 ```
 
 **Note that Rack::Component does not escape strings by default**. To escape
-strings, you can either use the `#h` helper like in the example above, or have
-your components render a template that escapes by default. See the
-[recipes][#recipes] section for more.
+strings, you can either use the `#h` helper like in the example above, or you
+can configure your components to render a template that escapes automatically.
+See the [recipes][#recipes] section for details.
 
 ## Table of Contents
-
-* [Getting Started](#getting-started)
-  * [Components as plain functions](#components-as-plain-functions)
-  * [Components as Rack::Components](#components-as-rackcomponents)
-  * [Components that re-render instantly](#components-that-re-render-instantly)
-* [Recipes](#recipes)
-  * [Render one component inside another](#render-one-component-inside-another)
-  * [Memoize an expensive component for one minute](#memoize-an-expensive-component-for-one-minute)
-  * [Memoize an expensive component until its content changes](#memoize-an-expensive-component-until-its-content-changes)
-  * [Render an HTML list from an array](#render-an-html-list-from-an-array)
-  * [Render a Rack::Component from a Rails controller](#render-a-rackcomponent-from-a-rails-controller)
-  * [Mount a Rack::Component as a Rack app](#mount-a-rackcomponent-as-a-rack-app)
-  * [Build an entire App out of Rack::Components](#build-an-entire-app-out-of-rackcomponents)
-* [API Reference](#api-reference)
-* [Performance](#performance)
-* [Compatibility](#compatibility)
-* [Anybody using this in production?](#anybody-using-this-in-production)
-* [Ruby reference](#ruby-reference)
-* [Development](#development)
-* [Contributing](#contributing)
-* [License](#license)
 
 ## Getting Started
 
@@ -81,12 +60,13 @@ methods, or state:
 ```ruby
 require 'rack/component'
 class FormalGreeter < Rack::Component
-  def title
-    env[:title] || "Queen"
+  render do |env|
+    "<h1>Hi, #{h title} #{h env[:name]}.</h1>"
   end
 
-  def render
-    "<h1>Hi, #{h title} #{h env[:name]}.</h1>"
+  # +env+ is available in instance methods too
+  def title
+    env[:title] || "Queen"
   end
 end
 
@@ -97,6 +77,17 @@ FormalGreeter.call(
 ) #=> <h1>Hi, Captain Kirk &lt;kirk@starfleet.gov&gt;.</h1>
 ```
 
+#### Components if you hate inheritance
+
+Instead of inheriting from `Rack::Component`, you can `extend` its methods:
+
+```ruby
+class SoloComponent
+  extend Rack::Component::Methods
+  render { "Family is complicated" }
+end
+```
+
 ## Recipes
 
 ### Render one component inside another
@@ -105,7 +96,9 @@ You can nest Rack::Components as if they were [React Children][jsx children] by
 calling them with a block.
 
 ```ruby
-Layout.call(title: 'Home') { Content.call }
+Layout.call(title: 'Home') do
+  Content.call
+end
 ```
 
 Here's a more fully fleshed example:
@@ -118,16 +111,16 @@ get '/posts/:id' do
   PostPage.call(id: params[:id])
 end
 
-# fetch a post from the database and render it inside a layout
+# Fetch a post from the database and render it inside a Layout
 class PostPage < Rack::Component
-  def render
-    @post = Post.find(env[:id])
+  render do |env|
+    post = Post.find env[:id]
     # Nest a PostContent instance inside a Layout instance,
     # with some arbitrary HTML too
-    Layout.call(title: @post.title) do
+    Layout.call(title: post.title) do
       <<~HTML
         <main>
-          #{PostContent.call(title: @post.title, body: @post.body)}
+          #{PostContent.call(title: post.title, body: post.body)}
           <footer>
             I am a footer.
           </footer>
@@ -137,38 +130,126 @@ class PostPage < Rack::Component
   end
 end
 
-class PostContent < Rack::Component
-  def render
-    <<~HTML
-      <article>
-        <h1>#{h env[:title]}</h1>
-        #{h env[:body]}
-      </article>
-    HTML
-  end
-end
-
 class Layout < Rack::Component
-  def render
+  # The +render+ macro supports Ruby's keyword arguments, and, like any other
+  # Ruby function, can accept a block via the & operator.
+  # Here, :title is a required key in +env+, and &child is just a regular Ruby
+  # block that could be named anything.
+  render do |title:, **, &child|
     <<~HTML
       <!DOCTYPE html>
       <html>
         <head>
-          <title>#{h env[:title]}</title>
+          <title>
         </head>
         <body>
-        #{yield}
+        #{child.call}
         </body>
       </html>
     HTML
   end
 end
+
+class PostContent < Rack::Component
+  render do |title:, body:, **|
+    <<~HTML
+      <article>
+        <h1>#{h title}</h1>
+        #{h body}
+      </article>
+    HTML
+  end
+end
+```
+
+### Render a template that escapes output by default via Tilt
+
+If you add [Tilt][tilt] and `erubi` to your Gemfile, you can use the `render`
+macro with an automatically-escaped template instead of a block.
+
+```ruby
+# Gemfile
+gem 'tilt'
+gem 'erubi'
+gem 'rack-component'
+
+# my_component.rb
+class TemplateComponent < Rack::Component
+  render erb: <<~ERB
+    <h1>Hello, <%= name %></h1>
+  ERB
+
+  def name
+    env[:name] || 'Someone'
+  end
+end
+
+TemplateComponent.call #=> <h1>Hello, Someone</h1>
+TemplateComponent.call(name: 'Spock<>') #=> <h1>Hello, Spock&lt;&gt;</h1>
+```
+
+Rack::Component passes `{ escape_html: true }` to Tilt by default, which enables
+automatic escaping in ERB (via erubi) Haml, and Markdown. To disable automatic
+escaping, or to pass other tilt options, use an `opts: {}` key in `render`:
+
+```ruby
+class OptionsComponent < Rack::Component
+  render opts: { escape_html: false, trim: false }, erb: <<~ERB
+    <article>
+      Hi there, <%= {env[:name] %>
+      <%== yield %>
+    </article>
+  ERB
+end
+```
+
+Template components support using the `yield` keyword to render child
+components, but note the double-equals `<%==` in the example above. If
+your component escapes HTML, and you're yielding to a component that renders
+HTML, you probably want to disable escaping via `==`, just for the
+`<%== yield %>` call. This is safe, as long as the component you're yielding to
+uses escaping.
+
+Using `erb` as a key for the inline template is a shorthand, which also works 
+with `haml` and `markdown`. But you can also specify `engine` and `template`
+explicitly.
+
+```ruby
+require 'haml'
+class HamlComponent < Rack::Component
+  # Note the special HEREDOC syntax for inline Haml templates! Without the
+  # single-quotes, Ruby will interpret #{strings} before Haml does.
+  render engine: 'haml', template: <<~'HAML'
+    %h1 Hi #{env[:name]}.
+  HAML
+end
+```
+
+Using a template instead of raw string interpolation is a safer default, but it
+can make it less convenient to do logic while rendering. Feel free to override
+your Component's `#initialize` method and do logic there:
+
+```ruby
+class EscapedPostView < Rack::Component
+  def initialize(env)
+    @post = Post.find(env[:id])
+    # calling `super` will populate the instance-level `env` hash, making
+    # `env` available outside this method. But it's fine to skip it.
+    super
+  end
+
+  render erb: <<~ERB
+    <article>
+      <h1><%= @post.title %></h1>
+      <%= @post.body %>
+    </article>
+  ERB
+end
 ```
 
 ### Render an HTML list from an array
 
-[JSX Lists][jsx lists] use JavaScript's `map` function. Rack::Component does
-likewise, only you need to call `join` on the array:
+[JSX Lists][jsx lists] use JavaScript's `map` function. Rack::Component does likewise, only you need to call `join` on the array:
 
 ```ruby
 require 'rack/component'
@@ -199,40 +280,6 @@ posts = [{ name: 'First Post', id: 1 }, { name: 'Second', id: 2 }]
 PostsList.call(posts: posts) #=> <h1>This is a list of posts</h1> <ul>...etc
 ```
 
-### Render erb, haml, or other templates via Tilt
-You can use [Tilt][tilt] to make your components render via your preferred
-templating language. You'll need to add `tilt` and a templating library to
-your `Gemfile`. Many templating libraries —notably erubi and haml — support
-escaping output by default via the `escape_html` option:
-
-```ruby
-require 'rack/component'
-require 'tilt'
-require 'erubi'
-
-class ERBComponent < Rack::Component
-  Template = Tilt['erb'].new(escape_html: true) do
-    <<~ERB
-      <h1>Hi, <%= env[:name] %>.</h1>
-    ERB
-  end
-
-  def render
-    Template.render(self)
-  end
-end
-
-ERBComponent.call(
-  name: 'Jim <kirk@starfleet.gov>'
-) #=> "<h1>Hi, Jim &lt;kirk@starfleet.gov&gt;.</h1>"
-```
-
-Rack::Component ships with a `render_template` macro that configures Tilt,
-turns on escaping by default, and defines `#render` for you.
-
-```ruby
-```
-
 ### Render a Rack::Component from a Rails controller
 
 ```ruby
@@ -253,7 +300,7 @@ end
 
 ### Mount a Rack::Component as a Rack app
 
-Because Rack::Components have the same signature as a Rack app, you can mount
+Because Rack::Components have the same signature as Rack app, you can mount
 them anywhere you can mount a Rack app. It's up to you to return a valid rack
 tuple, though.
 
@@ -289,14 +336,42 @@ Rack::Component instead of Controllers, Views, and templates. But to see an
 entire app built only out of Rack::Components, see
 [the example spec](https://github.com/chrisfrank/rack-component/blob/master/spec/raw_rack_example_spec.rb).
 
+
+### Define `#render` at the instance level instead of via `render do`
+
+The class-level `render` macro exists to make using templates easy, and to lean
+on Ruby's keyword arguments as a limited imitation of React's `defaultProps` and
+`PropTypes`. But you can define render at the instance level instead.
+
+```ruby
+# these two components render identical output
+
+class MacroComponent < Rack::Component
+  render do |name:, dept: 'Engineering'|
+    "#{name} - #{dept}"
+  end
+end
+
+class ExplicitComponent < Rack::Component
+  def initialize(name:, dept: 'Engineering')
+    @name = name
+    @dept = dept
+    # calling `super` will populate the instance-level `env` hash, making
+    # `env` available outside this method. But it's fine to skip it.
+    super
+  end
+
+  def render
+    "#{@name} - #{@dept}"
+  end
+end
+```
+
 ## API Reference
 
 The full API reference is available here:
 
 https://www.rubydoc.info/gems/rack-component
-
-For info on how to clear or change the size of the memoziation cache, please see
-[the spec][spec].
 
 ## Performance
 
@@ -304,20 +379,24 @@ On my machine, Rendering a Rack::Component is almost 10x faster than rendering a
 comparable Tilt template, and almost 100x faster than ERB from the Ruby standard
 library. Run `ruby spec/benchmarks.rb` to see what to expect in your env.
 
+Every component in the benchmark is configured to escape HTML when rendering.
+
 ```
 $ ruby spec/benchmarks.rb
 Warming up --------------------------------------
-     Ruby stdlib ERB     2.807k i/100ms
-       Tilt (cached)    28.611k i/100ms
-              Lambda   249.958k i/100ms
-           Component   161.176k i/100ms
-Component [memoized]    94.586k i/100ms
+          stdlib ERB     2.682k i/100ms
+            Tilt ERB    15.958k i/100ms
+         Bare lambda    77.124k i/100ms
+     RC [def render]    64.905k i/100ms
+      RC [render do]    57.725k i/100ms
+    RC [render erb:]    15.595k i/100ms
 Calculating -------------------------------------
-     Ruby stdlib ERB     29.296k (± 2.0%) i/s -    148.771k in   5.080274s
-       Tilt (cached)    319.935k (± 2.8%) i/s -      1.602M in   5.012009s
-              Lambda      6.261M (± 1.2%) i/s -     31.495M in   5.031302s
-           Component      2.773M (± 1.8%) i/s -     14.022M in   5.057528s
-Component [memoized]      1.276M (± 0.9%) i/s -      6.432M in   5.041348s
+          stdlib ERB     27.423k (± 1.8%) i/s -    139.464k in   5.087391s
+            Tilt ERB    169.351k (± 2.2%) i/s -    861.732k in   5.090920s
+         Bare lambda    929.473k (± 3.0%) i/s -      4.705M in   5.065991s
+     RC [def render]    775.176k (± 1.1%) i/s -      3.894M in   5.024347s
+      RC [render do]    686.653k (± 2.3%) i/s -      3.464M in   5.046728s
+    RC [render erb:]    165.113k (± 1.7%) i/s -    826.535k in   5.007444s
 ```
 
 Notice that using `Component#memoized` is _slower_ than using `Component#call`
