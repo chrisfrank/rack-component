@@ -35,7 +35,7 @@ run Sinatra::Application
 **Note that Rack::Component does not escape strings by default**. To escape
 strings, you can either use the `#h` helper like in the example above, or you
 can configure your components to render a template that escapes automatically.
-See the [recipes][#recipes] section for details.
+See the [Recipes](#recipes) section for details.
 
 ## Table of Contents
 
@@ -162,7 +162,7 @@ class Layout < Rack::Component
       <!DOCTYPE html>
       <html>
         <head>
-          <title>
+          <title>#{h title}</title>
         </head>
         <body>
         #{child.call}
@@ -276,7 +276,7 @@ likewise, only you need to call `join` on the array:
 ```ruby
 require 'rack/component'
 class PostsList < Rack::Component
-  def render
+  render do
     <<~HTML
       <h1>This is a list of posts</h1>
       <ul>
@@ -289,7 +289,7 @@ class PostsList < Rack::Component
     env[:posts].map { |post|
       <<~HTML
         <li class="item">
-          <a href="/posts/#{post[:id]}>
+          <a href="/posts/#{post[:id]}">
             #{post[:name]}
           </a>
         </li>
