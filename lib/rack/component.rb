@@ -20,7 +20,6 @@ module Rack
     module Methods
       def self.extended(base)
         base.include(InstanceMethods)
-        base.define_method(:initialize) { |env| @env = env }
       end
 
       def render(opts = {})
@@ -32,13 +31,21 @@ module Rack
       end
 
       # Instances of Rack::Component come with these methods.
+      # :reek:ModuleInitialize
       module InstanceMethods
         # +env+ is Rack::Component's version of React's +props+ hash.
+        def initialize(env)
+          @env = env
+        end
+
+        # +env+ can be an empty hash, but cannot be nil
+        # @return [Hash]
         def env
           @env || {}
         end
 
         # +h+ removes HTML characters from strings via +CGI.escapeHTML+.
+        # @return [String]
         def h(obj)
           CGI.escapeHTML(obj.to_s)
         end
