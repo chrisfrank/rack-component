@@ -396,9 +396,8 @@ https://www.rubydoc.info/gems/rack-component
 
 ## Performance
 
-On my machine, Rendering a Rack::Component is almost 10x faster than rendering a
-comparable Tilt template, and almost 100x faster than ERB from the Ruby standard
-library. Run `ruby spec/benchmarks.rb` to see what to expect in your env.
+Run `ruby spec/benchmarks.rb` to see what to expect in your environment. These
+results are from a 2015 iMac:
 
 ```
 $ ruby spec/benchmarks.rb
