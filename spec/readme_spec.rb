@@ -6,81 +6,136 @@ RSpec.describe 'Examples from the README' do
       "<h1>Hi, #{env[:name]}.</h1>"
     end
 
-    expect(
-      Greeter.call(name: 'James')
-    ).to eq("<h1>Hi, James.</h1>")
+    expect(Greeter.call(name: 'James')).to eq("<h1>Hi, James.</h1>")
   end
 
   it 'upgrades to a component for more complex logic' do
     require 'rack/component'
 
-    class FancyGreeter < Rack::Component
-      render do |env|
-        "<h1>Hi, #{title} #{env[:name]}.</h1>"
-      end
+    class FormalGreeter < Rack::Component
+      render erb: '<h1>Hi, <%= title %> <%= env[:name] %>.</h1>'
 
       def title
-        env[:title] || "President"
+        env[:title] || "Queen"
       end
     end
 
     expect(
-      FancyGreeter.call(name: 'Macron')
-    ).to eq("<h1>Hi, President Macron.</h1>")
+      FormalGreeter.call(name: 'Franklin')
+    ).to eq("<h1>Hi, Queen Franklin.</h1>")
     expect(
-      FancyGreeter.call(name: 'Merkel', title: 'Chancellor')
-    ).to eq("<h1>Hi, Chancellor Merkel.</h1>")
-  end
-
-  it 'uses memoized to speed up re-rendering' do
-    module Net
-      module HTTP
-        def self.get(uri); 'President'; end
-      end
-    end
-
-    class NetworkGreeter < Rack::Component
-      render do |env|
-        "<h1>Hi, #{title} #{env[:name]}.</h1>"
-      end
-
-      def title
-        Net::HTTP.get("http://api.heads-of-state.gov/?q=#{env[:name]}")
-      end
-    end
-
-    expect(
-      NetworkGreeter.memoized(name: 'Macron')
-    ).to eq("<h1>Hi, President Macron.</h1>")
+     FormalGreeter.call(title: 'Captain', name: 'Kirk <kirk@starfleet.gov>')
+    ).to eq("<h1>Hi, Captain Kirk &lt;kirk@starfleet.gov&gt;.</h1>")
   end
 
   describe 'Recipes' do
+    it 'Renders one component inside another' do
+      Post = Struct.new(:title, :body) do
+        def self.find(*); new('Hi', 'Hello'); end
+      end
+
+      # Fetch a post from the database and render it inside a Layout
+      class PostPage < Rack::Component
+        render do |env|
+          post = Post.find env[:id]
+          # Nest a PostContent instance inside a Layout instance,
+          # with some arbitrary HTML too
+          Layout.call(title: post.title) do
+            <<~HTML
+              <main>
+                #{PostContent.call(title: post.title, body: post.body)}
+                <footer>
+                  I am a footer.
+                </footer>
+              </main>
+            HTML
+          end
+        end
+      end
+
+      class Layout < Rack::Component
+        # Note that render blocks support Ruby's keyword arguments, and, like
+        # any other ruby function, can accept a block.
+        #
+        # Here, :title is a required key in +env+, while &child
+        # is just a regular Ruby block that could be named anything.
+        render do |title:, **, &child|
+          <<~HTML
+            <!DOCTYPE html>
+            <html>
+              <head>
+                <title>
+              </head>
+              <body>
+              #{child.call}
+              </body>
+            </html>
+          HTML
+        end
+      end
+
+      class PostContent < Rack::Component
+        render do |title:, body:, **|
+          <<~HTML
+            <article>
+              <h1>#{h title}</h1>
+              #{h body}
+            </article>
+          HTML
+        end
+      end
+
+      expect(PostPage.call(id: 1)).to include('<h1>Hi</h1>')
+    end
+
     it 'renders a list of posts' do
       class PostsList < Rack::Component
-        render do |env|
+        render do |posts:, **|
           <<~HTML
             <h1>This is a list of posts</h1>
             <ul>
-              #{render_items}
+              #{posts.map { |post| render_item(post) }.join}
             </ul>
           HTML
         end
 
-        def render_items
-          env[:posts].map { |post|
-            <<~HTML
-              <li class="item">
-                <a href="/posts/#{post[:id]}>
-                  #{post[:name]}
-                </a>
-              </li>
-            HTML
-          }.join
+        def render_item(post)
+          <<~HTML
+            <li class="item">
+              <a href="/posts/#{post[:id]}">
+                #{h post[:name]}
+              </a>
+            </li>
+          HTML
         end
       end
 
       posts = [{ name: 'First Post', id: 1 }, { name: 'Second', id: 2 }]
       expect(PostsList.call(posts: posts)).to include('First Post')
+    end
+
+    describe 'with tilt' do
+      require 'rack/component'
+      require 'tilt'
+      require 'erubi'
+
+      it 'renders ERB via a +render+ macro' do
+        class MacroComponent < Rack::Component
+          render erb: "<h1>Hi, <%= name %>.</h1>"
+
+          def name
+            env[:name] || 'jim'
+          end
+        end
+
+        expect(
+          MacroComponent.call(
+            name: 'Jim <kirk@starfleet.gov>',
+          )
+        ).to eq(
+          "<h1>Hi, Jim &lt;kirk@starfleet.gov&gt;.</h1>"
+        )
+      end
     end
   end
 end
