@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    rack-component (0.4.2)
+    rack-component (0.5.0)
 
 GEM
   remote: https://rubygems.org/

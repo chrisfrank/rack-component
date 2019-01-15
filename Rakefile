@@ -16,6 +16,7 @@ task :doc do
 end
 
 task :commit do
+  sh 'bundle install'
   sh 'bundle exec rake'
   sh 'git add -A && git commit --verbose'
 end
